@@ -47,12 +47,13 @@ static func events() -> Array[EventDef]:
 
 
 static func _entry_event_beast() -> EventDef:
+	# 穴を埋める根拠は、冒険者が「実際に見たこと」（松明で怯んだ）。推測では埋めない。
 	return _event(&"e2_beast",
-		"爪の長い獣がこっちに来る！手元には[kw:torch]松明[/kw]しかない…これで追い払えるのかな？",
+		"爪の長い獣がこっちに来る！とっさに[kw:torch]松明[/kw]を振ったら、怯んで後ずさった！今のうちにどうする？",
 		&"battle", 13, {&"torch": &"beast_aversion"},
-		"…火を嫌う、ってノートに書いてあった。追い払える！",
-		"松明を振りかざしたら、獣は唸って去っていったよ。",
-		"獣に飛びかかられて、荷物の一部を落としちゃった…")
+		"松明で怯んだ…ってことは、火が苦手なんだ！ノートに書いておくね。",
+		"火を突きつけながら押し返したら、獣は唸って去っていったよ。",
+		"押し切れなくて、飛びかかられて荷物の一部を落としちゃった…")
 
 
 static func _entry(id: StringName, page: StringName, title: String, body: String,

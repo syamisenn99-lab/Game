@@ -161,7 +161,7 @@ MatchingScreen (Control)
 │   └─ NoteBook (Control)
 │        ├─ PageTabs (TabBar)
 │        └─ EntryList (VBoxContainer → NoteEntryView × n)
-└─ CommandPanel (VBoxContainer)  # 方針ボタン / 能力ボタン / 主人公セリフ
+└─ CommandPanel (VBoxContainer)  # 能力ボタン / 主人公セリフ
 ```
 
 ### ドラッグ＆ドロップ

@@ -14,7 +14,7 @@ static func entries() -> Array[NoteEntry]:
 	var list: Array[NoteEntry] = []
 	list.append(_entry(&"mushroom_poison", &"plants", "毒キノコの見分け方",
 		"傘に青い斑点があるものは猛毒。触れただけでも手がかぶれるらしい。近づかず、触れないように避けて通ること。"))
-	# 又聞きの記述が間違っている例。報告と食い違ったとき、「食べられる」を訂正できる
+	# 又聞きの記述が間違っている例。報告と食い違ったとき、「触っても無害」を訂正できる
 	var moss := _entry(&"glow_moss", &"plants", "光る苔",
 		"暗い通路で光る苔は、{fix:moss_safe}。苦味が強い。群生している所は、立ち止まらずに離れて通ること。",
 		{&"moss_safe": "触るとしびれる"}, 0)

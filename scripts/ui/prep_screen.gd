@@ -362,8 +362,8 @@ func _maybe_play_story() -> bool:
 		StoryDirector.play.call_deferred(get_tree(), scene.id, PREP_SCENE)
 		return true
 	# プロローグのあと、チュートリアルの冒険が終わっていなければ、そこから再開する
-	if StoryDirector.pending_tutorial():
-		StoryDirector.start_tutorial.call_deferred(get_tree())
+	if StoryDirector.pending_first_adventure():
+		StoryDirector.start_first_adventure.call_deferred(get_tree())
 		return true
 	return false
 

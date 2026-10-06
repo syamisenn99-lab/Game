@@ -9,7 +9,7 @@ const NARRATOR := ""
 static func all() -> Array[StoryScene]:
 	var list: Array[StoryScene] = []
 	list.append(_prologue())
-	list.append(_prologue_after_tutorial())
+	list.append(_prologue_after_guided())
 	list.append(_intro_mercenary())
 	list.append(_intro_doctor())
 	list.append(_intro_noble())
@@ -55,14 +55,14 @@ static func _prologue() -> StoryScene:
 	_c(s, "幼なじみ", "久しぶり。……あのね、私、冒険者になったんだ。", &"childhood")
 	_c(s, "幼なじみ", "浅い階層だけでいいの。耳飾りで、道案内してくれない？ あなたのノートが、きっと役に立つから。", &"childhood")
 	_n(s, "あなたは、しばらく迷って、耳飾りを、そっと耳につけた。")
-	s.starts_tutorial = true
+	s.starts_first_adventure = true
 	return s
 
 
 ## チュートリアルの冒険のあと
-static func _prologue_after_tutorial() -> StoryScene:
+static func _prologue_after_guided() -> StoryScene:
 	var s := _scene(&"prologue_2", "プロローグ（つづき）")
-	s.requires_seen = [&"tutorial"]
+	s.requires_seen = [&"first_adventure"]
 	_n(s, "探索を終えて、耳飾りを外すと、静かな部屋に戻ってきた。久しぶりに、誰かの声を聞いた気がした。")
 	_c(s, "幼なじみ", "ねえ。この耳飾り、ほかの冒険者にも貸さない？ あなたがガイドになって、いろんな人から手がかりを集めるの。", &"childhood")
 	_c(s, "幼なじみ", "ダンジョンの情報は、公にはほとんど出回ってない。だったら、お姉さんの手がかりも、冒険者たちが持ってるかもしれないでしょ？", &"childhood")

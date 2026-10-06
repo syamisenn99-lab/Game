@@ -17,5 +17,9 @@ extends Resource
 @export var fail_text: String
 ## 冒険者のスケッチ（assets/illustrations/sketches/<この名前>.png）。空なら絵なし
 @export var sketch: StringName
-## チュートリアルの案内文。キー: report（文字送り中）, drag（運ぶ言葉と行き先を示す）, wrong_drop, matched, command（選ぶ指示を示す）, wrong_command, result
+## 初めての冒険の案内。物語のセリフとして、操作を伝える。キー: report（文字送り中）, drag（運ぶ言葉と行き先を示す）,
+## wrong_drop, matched, command（選ぶ指示を示す）, wrong_command, result。値は {"speaker": 名前（空なら語り）, "text": 文}
 @export var coach: Dictionary = {}
+## 初めての冒険で、出来事の前と後に挟む会話。各行は StoryScene.lines と同じ形（speaker / text / portrait）
+var before_lines: Array[Dictionary] = []
+var after_lines: Array[Dictionary] = []

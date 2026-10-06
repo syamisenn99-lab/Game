@@ -46,14 +46,18 @@ var _sketch_frame: Control
 var _sketch_shown := false
 var _report_done := false
 ## チュートリアル（プロローグのあとの最初の冒険）の最中か。案内の吹き出しが出て、時間は止まる
-var _tutorial := false
+var _guided := false
 var _coach_row: PanelContainer
 var _coach_label: Label
-var _skip_tutorial_button: Button
+var _skip_adventure_button: Button
 var _guided_chips: Array[KeywordChip] = []
 var _guide_target_view: NoteEntryView
 var _guide_target_slot: BlankSlot
 var _guided_button: Button
+## 初めての冒険の会話ボックス（出来事の前後）。出ている間は、文字送りが止まる
+var _dialogue: DialogueBox
+var _coach_name: Label
+var _coach_face: TextureRect
 var _guide_button_tween: Tween
 var _log_scroll: ScrollContainer
 var _mute_button: Button
@@ -63,17 +67,17 @@ var settlement: Dictionary = {}
 
 func _ready() -> void:
 	rng.randomize()
-	_tutorial = GameSession.tutorial_active
+	_guided = GameSession.first_adventure_active
 	_build_ui()
 	var entries := SampleData.entries()
 	_entries = entries
 	GameSession.load_notebook()
-	if _tutorial:
-		# チュートリアル: 幼なじみと、3つの短い場面。本番のノート・お金・日数には影響しない（ノートは空の状態から）
-		var tutor := SampleData.adventurer(SampleData.CHILDHOOD)
-		state = MatchingState.new(tutor, SampleData.events(SampleData.TUTORIAL), entries, {})
-		state.tutorial = true
-		_start_tutorial_ui()
+	if _guided:
+		# 幼なじみとの初めての冒険。お金・日数には影響しないが、埋めた・直したノートは、そのまま本番のノートに残る
+		var friend := SampleData.adventurer(SampleData.CHILDHOOD)
+		state = MatchingState.new(friend, SampleData.events(SampleData.FIRST_ADVENTURE), entries, GameSession.filled_blanks)
+		state.guided = true
+		_start_guided_ui()
 	else:
 		var real := SampleData.adventurer(GameSession.adventurer_id)
 		state = MatchingState.new(real, SampleData.events(real.id), entries, GameSession.filled_blanks)
@@ -96,6 +100,9 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	if _phase != Phase.REPORTING:
+		return
+	# 会話ボックスが出ている間は、文字送りも止める
+	if _dialogue != null and is_instance_valid(_dialogue) and not _dialogue.done:
 		return
 	_advance_typewriter(delta)
 	_warn_low_time()
@@ -151,12 +158,12 @@ func _build_ui() -> void:
 	_time_label = _desk_label("")
 	_time_label.custom_minimum_size = Vector2(64, 0)
 	top.add_child(_time_label)
-	_skip_tutorial_button = Button.new()
-	_skip_tutorial_button.text = "チュートリアルをとばす"
-	_skip_tutorial_button.custom_minimum_size = Vector2(190, 32)
-	_skip_tutorial_button.visible = false
-	_skip_tutorial_button.pressed.connect(_on_skip_tutorial)
-	top.add_child(_skip_tutorial_button)
+	_skip_adventure_button = Button.new()
+	_skip_adventure_button.text = "この冒険をとばす"
+	_skip_adventure_button.custom_minimum_size = Vector2(170, 32)
+	_skip_adventure_button.visible = false
+	_skip_adventure_button.pressed.connect(_on_skip_adventure)
+	top.add_child(_skip_adventure_button)
 	_mute_button = Button.new()
 	_mute_button.text = Sfx.mute_button_text()
 	_mute_button.custom_minimum_size = Vector2(96, 32)
@@ -171,18 +178,25 @@ func _build_ui() -> void:
 	var coach_box := HBoxContainer.new()
 	coach_box.add_theme_constant_override("separation", 12)
 	_coach_row.add_child(coach_box)
-	var coach_face := TextureRect.new()
-	coach_face.custom_minimum_size = Vector2(52, 52)
-	coach_face.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	coach_face.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	coach_face.texture = Illustrations.find("portraits", SampleData.CHILDHOOD)
-	coach_box.add_child(coach_face)
+	_coach_face = TextureRect.new()
+	_coach_face.custom_minimum_size = Vector2(52, 52)
+	_coach_face.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_coach_face.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_coach_face.visible = false
+	coach_box.add_child(_coach_face)
+	var coach_col := VBoxContainer.new()
+	coach_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	coach_col.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	coach_col.add_theme_constant_override("separation", 2)
+	coach_box.add_child(coach_col)
+	_coach_name = Label.new()
+	_coach_name.add_theme_font_size_override("font_size", 18)
+	_coach_name.add_theme_color_override("font_color", Color("8a4a1a"))
+	coach_col.add_child(_coach_name)
 	_coach_label = Label.new()
 	_coach_label.autowrap_mode = TextServer.AUTOWRAP_ARBITRARY
-	_coach_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_coach_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_coach_label.add_theme_font_size_override("font_size", 21)
-	coach_box.add_child(_coach_label)
+	coach_col.add_child(_coach_label)
 
 	# 中央: 通信ログ（左）とノート（右）
 	var middle := HBoxContainer.new()
@@ -314,7 +328,7 @@ func _start_next_event() -> void:
 	_selected_chip = null
 	_last_whole_sec = 99
 	_set_command_hint(false)
-	_tutorial_clear_guides()
+	_clear_guides()
 	for view: NoteEntryView in _entry_views.values():
 		view.show_stamp(false)
 	_build_report()
@@ -322,12 +336,17 @@ func _start_next_event() -> void:
 	_dice_label.text = ""
 	_next_button.visible = false
 	_set_stat_buttons_enabled(true)
-	_event_label.text = "%s %d / %d" % ["チュートリアル" if _tutorial else "イベント", state.event_index + 1, state.events.size()]
-	_reward_label.text = "" if _tutorial else "持ち帰り報酬: %d" % int(state.reward)
+	_event_label.text = "%s %d / %d" % ["第1層・入口" if _guided else "イベント", state.event_index + 1, state.events.size()]
+	_reward_label.text = "" if _guided else "持ち帰り報酬: %d" % int(state.reward)
 	_timer_bar.max_value = state.event_time_limit
 	_update_timer_ui()
 	_refresh_suspects()
-	_coach("report")
+	if _guided:
+		# 初めての冒険: 出来事の前の会話が先。終わったら、案内（物語のセリフ）が始まる
+		_coach_label.text = ""
+		_coach_name.text = ""
+		_coach_face.visible = false
+		_play_dialogue(state.current.before_lines, func() -> void: _coach("report"))
 	if state.auto_matched:
 		_announce_known_note()
 
@@ -404,8 +423,8 @@ func _on_report_complete() -> void:
 	if _report_done:
 		return
 	_report_done = true
-	if _tutorial:
-		_tutorial_guide_drag()
+	if _guided:
+		_guide_drag()
 
 
 ## 冒険者の描いたスケッチを、紙に貼ったように見せる
@@ -455,7 +474,7 @@ func _apply_reveal() -> void:
 
 
 func _update_timer_ui() -> void:
-	if _tutorial:
+	if _guided:
 		_timer_bar.max_value = 1.0
 		_timer_bar.value = 1.0
 		_timer_bar.modulate = Color.WHITE
@@ -618,13 +637,12 @@ func _on_keyword_dropped(keyword_id: StringName, target_id: StringName) -> void:
 			Effects.float_text(_overlay, "訂正！" if state.is_fix(target_id) else "照合！", at + Vector2(0, -24), Palette.OK)
 			_set_command_hint(true)
 			_refresh_suspects()
-			if _tutorial:
-				_tutorial_clear_guides()
+			GameSession.save_notebook()
+			if _guided:
+				_clear_guides()
 				_coach_matched()
-			else:
-				GameSession.save_notebook()
 		MatchingState.DropResult.MISMATCH:
-			if _tutorial:
+			if _guided:
 				_line_label.text = "うーん、ここじゃないみたい。"
 				_coach("wrong_drop")
 			else:
@@ -636,7 +654,7 @@ func _on_keyword_dropped(keyword_id: StringName, target_id: StringName) -> void:
 			Sfx.play(&"mismatch")
 			Effects.burst(_overlay, at, Palette.NG, 12, false)
 			Effects.float_text(_overlay, "ちがう…", at + Vector2(0, -24), Palette.NG, 26)
-			if not _tutorial:
+			if not _guided:
 				var bar_end := _timer_bar.get_global_rect().get_center()
 				Effects.float_text(_overlay, "-%.1f秒" % (Rules.MISMATCH_PENALTY_SEC * state.penalty_scale), bar_end + Vector2(0, 36), Palette.NG, 26)
 				_update_timer_ui()
@@ -651,10 +669,10 @@ func _on_stat_chosen(stat: StringName) -> void:
 	if _phase == Phase.REPORTING:
 		Sfx.play(&"click")
 		# チュートリアルでは、手順どおりに進める（先に照合する、正しい指示を選ぶ）
-		if _tutorial:
+		if _guided:
 			if not state.matched:
 				Sfx.play(&"mismatch")
-				_coach_text("まず、黄色くハイライトされた言葉を、ノートに運ぼう。指示を出すのは、そのあとだよ。")
+				_coach_say("", "……まず、黄色くハイライトされた言葉を、ノートに運ぼう。指示を伝えるのは、そのあとだ。")
 				return
 			if stat != state.current.required_stat:
 				Sfx.play(&"mismatch")
@@ -718,11 +736,15 @@ func _resolve(chosen: StringName) -> void:
 		_line_label.text += "（大失敗…！）"
 	_reward_label.text = "持ち帰り報酬: %d" % int(state.reward)
 	_next_button.text = "次へ" if state.has_next() else "探索を終える"
-	if _tutorial:
-		_tutorial_clear_guides()
-		_coach("result")
-	_next_button.visible = true
 	_phase = Phase.RESULT
+	if _guided:
+		# 初めての冒険: 結果のあとの会話が流れて、次の出来事（最後は、冒険の終わり）へ進む
+		_clear_guides()
+		_coach("result")
+		_next_button.visible = false
+		_play_dialogue(state.current.after_lines, _after_guided_event)
+		return
+	_next_button.visible = true
 
 
 func _format_result(res: Dictionary) -> String:
@@ -736,8 +758,8 @@ func _format_result(res: Dictionary) -> String:
 
 func _show_summary() -> void:
 	_phase = Phase.SUMMARY
-	if _tutorial:
-		_show_tutorial_summary()
+	if _guided:
+		_finish_first_adventure()
 		return
 	var dim := ColorRect.new()
 	dim.color = Color(0, 0, 0, 0.6)
@@ -807,35 +829,63 @@ func _settle_line(left: String, right: String, color: Color) -> Label:
 	return label
 
 
-# ---------------------------------------------------------------- チュートリアル
+# ---------------------------------------------------------------- 幼なじみとの初めての冒険
 
-## チュートリアルの見た目にする（案内の吹き出しを出し、お金の表示などを隠す）
-func _start_tutorial_ui() -> void:
+## 初めての冒険の見た目にする（案内を出し、お金や時間の表示を隠す）
+func _start_guided_ui() -> void:
 	_coach_row.visible = true
-	_skip_tutorial_button.visible = true
+	_skip_adventure_button.visible = true
 	_reward_label.visible = false
 	_timer_bar.visible = false
+	_time_label.visible = false
 
 
-## 案内文を出す。キーは EventDef.coach のもの
+## 案内を出す。キーは EventDef.coach のもの。値は {"speaker": 名前（空なら語り）, "text": 文}
 func _coach(key: String) -> void:
-	if not _tutorial or state == null or state.current == null:
+	if not _guided or state == null or state.current == null:
 		return
-	var text: String = state.current.coach.get(key, "")
-	if text != "":
-		_coach_text(text)
+	var entry: Dictionary = state.current.coach.get(key, {})
+	if not entry.is_empty():
+		_coach_say(String(entry["speaker"]), String(entry["text"]))
 
 
-func _coach_text(text: String) -> void:
-	if not _tutorial:
+## 案内の1文を、物語のセリフとして出す。セリフなら「」と顔つき、語りなら地の文
+func _coach_say(speaker: String, text: String) -> void:
+	if not _guided:
 		return
-	_coach_label.text = text
+	_coach_name.text = speaker
+	_coach_name.visible = speaker != ""
+	var face: Texture2D = null
+	if speaker == "幼なじみ":
+		face = Illustrations.find("portraits", SampleData.CHILDHOOD)
+	_coach_face.texture = face
+	_coach_face.visible = face != null
+	_coach_label.text = "「%s」" % text if speaker != "" else text
 	_coach_row.modulate = Color(1.0, 1.0, 0.7)
 	create_tween().tween_property(_coach_row, "modulate", Color.WHITE, 0.5)
 
 
+## 会話ボックスを出す。読み終えたら done を呼ぶ（行が無ければ、すぐに呼ぶ）
+func _play_dialogue(lines: Array[Dictionary], done: Callable) -> void:
+	if lines.is_empty():
+		done.call()
+		return
+	_dialogue = DialogueBox.new()
+	add_child(_dialogue)
+	_dialogue.finished.connect(done)
+	_dialogue.setup(lines)
+
+
+## 結果のあとの会話が終わったら、次の出来事へ。最後なら、冒険を終える
+func _after_guided_event() -> void:
+	if state.has_next():
+		_start_next_event()
+	else:
+		_finish_first_adventure()
+
+
 ## 報告を読み終えたら、運ぶ言葉と、行き先を、金色に光らせて示す
-func _tutorial_guide_drag() -> void:
+func _guide_drag() -> void:
 	if state.matched or state.current == null:
 		return
 	_coach("drag")
@@ -865,9 +915,10 @@ func _tutorial_guide_drag() -> void:
 
 ## 照合できたとき: ノートの内容を伝え、選ぶ指示を光らせる
 func _coach_matched() -> void:
-	var matched_text: String = state.current.coach.get("matched", "")
-	var command_text: String = state.current.coach.get("command", "")
-	_coach_text((matched_text + "\n" + command_text).strip_edges())
+	var matched_entry: Dictionary = state.current.coach.get("matched", {})
+	var command_entry: Dictionary = state.current.coach.get("command", {})
+	var text := (String(matched_entry.get("text", "")) + "\n" + String(command_entry.get("text", ""))).strip_edges()
+	_coach_say(String(matched_entry.get("speaker", "")), text)
 	var button := _stat_buttons.get(state.current.required_stat) as Button
 	if button != null:
 		_guided_button = button
@@ -877,7 +928,7 @@ func _coach_matched() -> void:
 		_guide_button_tween.tween_property(button, "scale", Vector2.ONE, 0.45).set_trans(Tween.TRANS_SINE)
 
 
-func _tutorial_clear_guides() -> void:
+func _clear_guides() -> void:
 	for chip in _guided_chips:
 		if is_instance_valid(chip):
 			chip.set_guide(false)
@@ -896,53 +947,13 @@ func _tutorial_clear_guides() -> void:
 	_guided_button = null
 
 
-func _on_skip_tutorial() -> void:
+func _on_skip_adventure() -> void:
 	Sfx.play(&"click")
-	_finish_tutorial()
+	_finish_first_adventure()
 
 
-## チュートリアルを終えて、続きの場面（プロローグのつづき）へ
-func _finish_tutorial() -> void:
-	GameSession.mark_seen(&"tutorial")
-	GameSession.tutorial_active = false
+## 初めての冒険を終えて、続きの場面（プロローグのつづき）へ
+func _finish_first_adventure() -> void:
+	GameSession.mark_seen(&"first_adventure")
+	GameSession.first_adventure_active = false
 	GameSession.go_to(get_tree(), PREP_SCENE)
-
-
-func _show_tutorial_summary() -> void:
-	var dim := ColorRect.new()
-	dim.color = Color(0, 0, 0, 0.6)
-	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
-	add_child(dim)
-	var center := CenterContainer.new()
-	center.set_anchors_preset(Control.PRESET_FULL_RECT)
-	add_child(center)
-	var panel := PanelContainer.new()
-	panel.add_theme_stylebox_override("panel", Palette.box(Palette.PAPER, Palette.INK, 3, 8, 24.0))
-	center.add_child(panel)
-	var vbox := VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 10)
-	panel.add_child(vbox)
-	var title := Label.new()
-	title.text = "チュートリアル完了！"
-	title.add_theme_font_size_override("font_size", 32)
-	vbox.add_child(title)
-	for text in [
-		"・黄色い言葉を、ノートの項目へ運んで、照合する",
-		"・ノートの空欄「？？？」を、見たことで埋めて、育てる",
-		"・ノートの間違いを、報告で訂正する",
-		"・照合したら、戦闘・探索・回避から、合う指示を選ぶ",
-	]:
-		var line := Label.new()
-		line.text = text
-		vbox.add_child(line)
-	var note := Label.new()
-	note.text = "ここからが、本番。本番では、制限時間があるよ。"
-	note.add_theme_color_override("font_color", Palette.INK_FAINT)
-	vbox.add_child(note)
-	var next := Button.new()
-	next.text = "つづきを見る"
-	next.custom_minimum_size = Vector2(0, 48)
-	next.pressed.connect(func() -> void:
-		Sfx.play(&"click")
-		_finish_tutorial())
-	vbox.add_child(next)

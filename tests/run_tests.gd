@@ -45,8 +45,8 @@ func _run() -> void:
 	await _test_mercenary_flow()
 	_test_new_adventurers_data()
 	await _test_doctor_and_noble_flow()
-	_test_tutorial_rules()
-	await _test_tutorial_flow()
+	_test_guided_rules()
+	await _test_guided_flow()
 	_test_story_data()
 	_test_story_director()
 	await _test_story_screen()
@@ -612,134 +612,138 @@ func _test_doctor_and_noble_flow() -> void:
 	_reset_session()
 
 
-## チュートリアルのルール（時間が止まる、間違えても減らない、正しければ必ず成功）
-func _test_tutorial_rules() -> void:
-	var events := SampleData.events(SampleData.TUTORIAL)
-	_check(events.size() == 3, "tutorial rules: three short scenes (%d)" % events.size())
+## 幼なじみとの初めての冒険のルール（時間が止まる、間違えても減らない、正しければ必ず成功）
+func _test_guided_rules() -> void:
+	var events := SampleData.events(SampleData.FIRST_ADVENTURE)
+	_check(events.size() == 3, "first adventure rules: three scenes (%d)" % events.size())
 	for ev in events:
 		for key in ["report", "drag", "wrong_drop", "matched", "command", "wrong_command", "result"]:
-			_check(String(ev.coach.get(key, "")) != "", "tutorial rules: %s has the %s message" % [ev.id, key])
-		_check(ev.sketch != &"" and Illustrations.find("sketches", ev.sketch, SampleData.CHILDHOOD) != null, "tutorial rules: %s has a sketch" % ev.id)
-	var state := MatchingState.new(SampleData.adventurer(), events, SampleData.entries(), {})
-	state.tutorial = true
+			var line: Dictionary = ev.coach.get(key, {})
+			_check(String(line.get("text", "")) != "" and line.has("speaker"), "first adventure rules: %s has the %s line" % [ev.id, key])
+		_check(not ev.before_lines.is_empty() and not ev.after_lines.is_empty(), "first adventure rules: %s has dialogue before and after" % ev.id)
+		_check(ev.sketch != &"" and Illustrations.find("sketches", ev.sketch, SampleData.CHILDHOOD) != null, "first adventure rules: %s has a sketch" % ev.id)
+	var state := MatchingState.new(SampleData.adventurer(SampleData.CHILDHOOD), events, SampleData.entries(), {})
+	state.guided = true
 	state.begin_next_event()
 	var before := state.time_left
-	_check(not state.tick(100.0) and is_equal_approx(state.time_left, before), "tutorial rules: the clock is stopped")
-	_check(state.drop(&"mushroom", &"glow_moss") == MatchingState.DropResult.MISMATCH and is_equal_approx(state.time_left, before), "tutorial rules: a mistake costs no time")
-	_check(state.drop(&"mushroom", &"mushroom_poison") == MatchingState.DropResult.MATCHED, "tutorial rules: the right drop still matches")
-	# 照合して正しい指示なら、どんなダイスの目でも成功する
+	_check(not state.tick(100.0) and is_equal_approx(state.time_left, before), "first adventure rules: the clock is stopped")
+	_check(state.drop(&"fm_mushroom", &"glow_moss") == MatchingState.DropResult.MISMATCH and is_equal_approx(state.time_left, before), "first adventure rules: a mistake costs no time")
+	_check(state.drop(&"fm_mushroom", &"mushroom_poison") == MatchingState.DropResult.MATCHED, "first adventure rules: the right drop still matches")
 	var always := true
 	for seed_value in 300:
-		var s := MatchingState.new(SampleData.adventurer(), SampleData.events(SampleData.TUTORIAL), SampleData.entries(), {})
-		s.tutorial = true
+		var s := MatchingState.new(SampleData.adventurer(SampleData.CHILDHOOD), SampleData.events(SampleData.FIRST_ADVENTURE), SampleData.entries(), {})
+		s.guided = true
 		s.begin_next_event()
-		s.drop(&"mushroom", &"mushroom_poison")
+		s.drop(&"fm_mushroom", &"mushroom_poison")
 		var rng := RandomNumberGenerator.new()
 		rng.seed = seed_value
 		if not s.resolve(&"evade", rng)["success"]:
 			always = false
-	_check(always, "tutorial rules: a matched and correct command always succeeds")
-	# 間違った指示は、保証されない（本番と同じ判定）
+	_check(always, "first adventure rules: a matched and correct command always succeeds")
 	var any_fail := false
 	for seed_value in 300:
-		var s2 := MatchingState.new(SampleData.adventurer(), SampleData.events(SampleData.TUTORIAL), SampleData.entries(), {})
-		s2.tutorial = true
+		var s2 := MatchingState.new(SampleData.adventurer(SampleData.CHILDHOOD), SampleData.events(SampleData.FIRST_ADVENTURE), SampleData.entries(), {})
+		s2.guided = true
 		s2.begin_next_event()
 		var rng2 := RandomNumberGenerator.new()
 		rng2.seed = seed_value
 		if not s2.resolve(&"battle", rng2)["success"]:
 			any_fail = true
-	_check(any_fail, "tutorial rules: success is not guaranteed without matching")
+	_check(any_fail, "first adventure rules: success is not guaranteed without matching")
 
 
-## チュートリアルの冒険を、画面で通して遊ぶ
-func _test_tutorial_flow() -> void:
+## 会話ボックスを、最後まで読み進める
+func _read_dialogue(screen: MatchingScreen) -> void:
+	var guard := 0
+	while screen._dialogue != null and is_instance_valid(screen._dialogue) and not screen._dialogue.done and guard < 100:
+		screen._dialogue.advance()
+		guard += 1
+		await _frames(1)
+	await _frames(2)
+
+
+## 幼なじみとの初めての冒険を、画面で通して遊ぶ
+func _test_guided_flow() -> void:
 	_reset_session()
-	GameSession.tutorial_active = true
-	GameSession.adventurer_id = SampleData.MERCENARY   # 選んでいる冒険者に関係なく、幼なじみの冒険になる
+	GameSession.first_adventure_active = true
+	GameSession.adventurer_id = SampleData.MERCENARY   # 選んでいる冒険者に関係なく、幼なじみとの冒険になる
 	var screen: MatchingScreen = load("res://scenes/matching_screen.tscn").instantiate()
 	root.add_child(screen)
 	await _frames(4)
-	_check(screen.state.tutorial and screen.state.adventurer.id == SampleData.CHILDHOOD and screen.state.events.size() == 3, "tutorial: a three-scene adventure with the childhood friend")
-	_check(screen._coach_row.visible and screen._skip_tutorial_button.visible, "tutorial: the guide bubble and the skip button are shown")
-	_check(not screen._reward_label.visible and screen._time_label.text == "練習", "tutorial: no reward and no clock")
-	_check(screen._event_label.text.begins_with("チュートリアル 1 / 3"), "tutorial: the counter says tutorial (%s)" % screen._event_label.text)
-	_check(screen._coach_label.text == screen.state.current.coach["report"], "tutorial: the first message appears while the report is being read")
-	# 読み終えると、運ぶ言葉と行き先が光る
+	_check(screen.state.guided and screen.state.adventurer.id == SampleData.CHILDHOOD and screen.state.events.size() == 3, "first adventure: three scenes with the childhood friend")
+	_check(screen._dialogue != null and is_instance_valid(screen._dialogue), "first adventure: the story dialogue opens first")
+	_check(not screen._reward_label.visible and not screen._time_label.visible and not screen._timer_bar.visible, "first adventure: no reward and no clock")
+	_check(not screen._event_label.text.contains("チュートリアル") and not screen._event_label.text.contains("練習"), "first adventure: no tutorial wording (%s)" % screen._event_label.text)
+	await _read_dialogue(screen)
+	_check(screen._coach_label.text.contains(screen.state.current.coach["report"]["text"]), "first adventure: the friend speaks while the report is read")
 	screen._reveal_all()
 	await _frames(3)
-	_check(screen._coach_label.text == screen.state.current.coach["drag"], "tutorial: it tells the player to carry the word")
-	_check(screen._chips[0].guided, "tutorial: the word to carry is highlighted")
+	_check(screen._coach_label.text.contains(screen.state.current.coach["drag"]["text"]), "first adventure: a line tells what to carry")
+	_check(screen._chips[0].guided, "first adventure: the word to carry is highlighted")
 	var mushroom_view: NoteEntryView = screen._entry_views[&"mushroom_poison"]
-	_check(mushroom_view.guide, "tutorial: the destination note entry is highlighted")
-	# 先に指示を選ぼうとしても、進まない
+	_check(mushroom_view.guide, "first adventure: the note to match is highlighted")
 	screen._on_stat_chosen(&"evade")
-	_check(screen._phase == MatchingScreen.Phase.REPORTING and screen._coach_label.text.contains("まず"), "tutorial: choosing a command before matching is gently refused")
-	# 違う場所に運んでも、時間は減らず、ヒントが出る
+	_check(screen._phase == MatchingScreen.Phase.REPORTING, "first adventure: choosing a command before matching is gently refused")
 	var left := screen.state.time_left
-	screen._on_keyword_dropped(&"mushroom", &"glow_moss")
-	_check(is_equal_approx(screen.state.time_left, left) and screen._coach_label.text == screen.state.current.coach["wrong_drop"], "tutorial: a wrong drop gives a hint, not a penalty")
-	# 正しく運ぶ → 指示が光る
-	screen._on_keyword_dropped(&"mushroom", &"mushroom_poison")
-	_check(screen.state.matched and not screen._chips[0].guided and not mushroom_view.guide, "tutorial: the guides are cleared after matching")
-	_check(screen._guided_button == screen._stat_buttons[&"evade"], "tutorial: the right command button is highlighted")
-	_check(screen._coach_label.text.contains(screen.state.current.coach["matched"]) and screen._coach_label.text.contains("回避"), "tutorial: it explains the note and points to the command")
-	# 違う指示は、進まない
+	screen._on_keyword_dropped(&"fm_mushroom", &"glow_moss")
+	_check(is_equal_approx(screen.state.time_left, left) and screen._coach_label.text.contains(screen.state.current.coach["wrong_drop"]["text"]), "first adventure: a wrong drop gives a hint, not a penalty")
+	screen._on_keyword_dropped(&"fm_mushroom", &"mushroom_poison")
+	_check(screen.state.matched and not screen._chips[0].guided and not mushroom_view.guide, "first adventure: the guides are cleared after matching")
+	_check(screen._guided_button == screen._stat_buttons[&"evade"], "first adventure: the right command button is highlighted")
 	screen._on_stat_chosen(&"battle")
-	_check(screen._phase == MatchingScreen.Phase.REPORTING and screen._coach_label.text == screen.state.current.coach["wrong_command"], "tutorial: a wrong command is refused with a hint")
+	_check(screen._phase == MatchingScreen.Phase.REPORTING and screen._coach_label.text.contains(screen.state.current.coach["wrong_command"]["text"]), "first adventure: a wrong command is refused with a hint")
 	screen._on_stat_chosen(&"evade")
 	await create_timer(1.0).timeout
-	_check(screen._phase == MatchingScreen.Phase.RESULT and screen.state.results[0]["success"], "tutorial: the right command succeeds")
-	_check(screen._coach_label.text == screen.state.current.coach["result"], "tutorial: it comments on the result")
+	_check(screen._phase == MatchingScreen.Phase.RESULT and screen.state.results[0]["success"], "first adventure: the right command succeeds")
+	_check(screen._dialogue != null and is_instance_valid(screen._dialogue), "first adventure: dialogue follows the result")
+	await _read_dialogue(screen)
 
 	# 2つ目: 空欄を埋める
-	screen._start_next_event()
 	await _frames(3)
+	_check(screen.state.event_index == 1, "first adventure: it moves on by itself to the second scene (%d)" % screen.state.event_index)
+	await _read_dialogue(screen)
 	screen._reveal_all()
 	await _frames(3)
 	var beast_view: NoteEntryView = screen._entry_views[&"beast_claw"]
 	var blank: BlankSlot = beast_view.slots[&"beast_aversion"]
-	_check(blank.guide and screen._chips[0].guided, "tutorial 2: the blank and the word are highlighted")
-	_check(screen._tabs.get_tab_control(screen._tabs.current_tab).is_ancestor_of(beast_view), "tutorial 2: the monsters page opens by itself")
-	screen._on_keyword_dropped(&"torch", &"beast_aversion")
-	_check(blank.filled and not blank.guide, "tutorial 2: the blank is filled")
+	_check(blank.guide and screen._chips[0].guided, "first adventure 2: the blank and the word are highlighted")
+	_check(screen._tabs.get_tab_control(screen._tabs.current_tab).is_ancestor_of(beast_view), "first adventure 2: the monsters page opens by itself")
+	screen._on_keyword_dropped(&"fm_torch", &"beast_aversion")
+	_check(blank.filled and not blank.guide, "first adventure 2: the blank is filled")
 	screen._on_stat_chosen(&"battle")
 	await create_timer(1.0).timeout
+	await _read_dialogue(screen)
 
 	# 3つ目: ノートを訂正する
-	screen._start_next_event()
 	await _frames(3)
+	_check(screen.state.event_index == 2, "first adventure: it moves on to the third scene (%d)" % screen.state.event_index)
+	await _read_dialogue(screen)
 	screen._reveal_all()
 	await _frames(3)
 	var moss_slot: BlankSlot = (screen._entry_views[&"glow_moss"] as NoteEntryView).slots[&"moss_safe"]
-	_check(moss_slot.guide or moss_slot.suspect, "tutorial 3: the wrong note is highlighted")
-	screen._on_keyword_dropped(&"numb", &"moss_safe")
-	_check(moss_slot.filled and moss_slot._label.text == "触るとしびれる", "tutorial 3: the note is corrected")
+	_check(moss_slot.guide or moss_slot.suspect, "first adventure 3: the wrong note is highlighted")
+	screen._on_keyword_dropped(&"fm_numb", &"moss_safe")
+	_check(moss_slot.filled and moss_slot._label.text == "触るとしびれる", "first adventure 3: the note is corrected")
+	_check(GameSession.filled_blanks.has(&"beast_aversion"), "first adventure: what the player filled stays in the real notebook")
+	var funds_before := GameSession.funds
+	GameSession.last_destination = ""
 	screen._on_stat_chosen(&"evade")
 	await create_timer(1.0).timeout
-
-	# 本番のノート・お金・日数には、影響しない
-	_check(GameSession.filled_blanks.is_empty(), "tutorial: the real notebook is untouched")
-	var funds_before := GameSession.funds
-	screen._start_next_event()
+	await _read_dialogue(screen)
 	await _frames(3)
-	_check(screen._phase == MatchingScreen.Phase.SUMMARY and screen.settlement.is_empty(), "tutorial: no settlement at the end")
-	_check(GameSession.funds == funds_before and GameSession.day == 1 and GameSession.runs_of(SampleData.CHILDHOOD) == 0, "tutorial: funds, day and run count are untouched")
-	# 終わると、見た場面になり、準備画面（プロローグのつづき）へ
-	GameSession.last_destination = ""
-	screen._finish_tutorial()
-	_check(GameSession.has_seen(&"tutorial") and not GameSession.tutorial_active and GameSession.last_destination == MatchingScreen.PREP_SCENE, "tutorial: finishing marks it done and heads back")
+	_check(GameSession.has_seen(&"first_adventure") and not GameSession.first_adventure_active and GameSession.last_destination == MatchingScreen.PREP_SCENE, "first adventure: finishing marks it done and heads back")
+	_check(GameSession.funds == funds_before and GameSession.day == 1 and GameSession.runs_of(SampleData.CHILDHOOD) == 0, "first adventure: funds, day and run count are untouched")
 	screen.queue_free()
 	await _frames(2)
 
 	# スキップ
 	_reset_session()
-	GameSession.tutorial_active = true
+	GameSession.first_adventure_active = true
 	var skipper: MatchingScreen = load("res://scenes/matching_screen.tscn").instantiate()
 	root.add_child(skipper)
 	await _frames(3)
-	skipper._on_skip_tutorial()
-	_check(GameSession.has_seen(&"tutorial") and not GameSession.tutorial_active, "tutorial: it can be skipped")
+	skipper._on_skip_adventure()
+	_check(GameSession.has_seen(&"first_adventure") and not GameSession.first_adventure_active, "first adventure: it can be skipped")
 	skipper.queue_free()
 	await _frames(2)
 	# 本番の探索には、案内が出ない
@@ -747,7 +751,7 @@ func _test_tutorial_flow() -> void:
 	var real: MatchingScreen = load("res://scenes/matching_screen.tscn").instantiate()
 	root.add_child(real)
 	await _frames(3)
-	_check(not real._coach_row.visible and not real.state.tutorial and real._timer_bar.visible, "tutorial: a real expedition has no guide and keeps the clock")
+	_check(not real._coach_row.visible and not real.state.guided and real._timer_bar.visible, "first adventure: a real expedition has no guide and keeps the clock")
 	real.queue_free()
 	await _frames(2)
 	_reset_session()
@@ -770,7 +774,7 @@ func _test_story_data() -> void:
 		for adventurer_id in scene.after_runs:
 			_check(adventurer_ids.has(StringName(adventurer_id)), "story data: %s refers to a real adventurer" % scene.id)
 		for required in scene.requires_seen:
-			_check(required == &"tutorial" or StoryData.find(required) != null, "story data: %s requires an existing scene" % scene.id)
+			_check(required == &"first_adventure" or StoryData.find(required) != null, "story data: %s requires an existing scene" % scene.id)
 		if scene.trigger == &"depart":
 			_check(adventurer_ids.has(scene.adventurer), "story data: %s introduces a real adventurer" % scene.id)
 	_check(StoryData.find(&"prologue") != null and StoryData.find(&"no_such_scene") == null, "story data: find works")
@@ -778,9 +782,9 @@ func _test_story_data() -> void:
 	for scene in StoryData.clues():
 		_check(scene.clue_title != "" and scene.clue_summary != "", "story data: clue %s has a heading and a summary" % scene.id)
 	var intros := scenes.filter(func(s: StoryScene) -> bool: return s.trigger == &"depart").map(func(s: StoryScene) -> StringName: return s.adventurer)
-	# 幼なじみは、チュートリアルで紹介済み。ほかの3人には、初めて出発するときの紹介がある
+	# 幼なじみは、初めての冒険で紹介済み。ほかの3人には、初めて出発するときの紹介がある
 	_check(intros.size() == 3 and not intros.has(SampleData.CHILDHOOD) and intros.has(SampleData.MERCENARY) and intros.has(SampleData.DOCTOR) and intros.has(SampleData.NOBLE), "story data: the three newcomers each have an intro scene")
-	_check(StoryData.find(&"prologue").starts_tutorial and not StoryData.find(&"prologue_2").starts_tutorial, "story data: the prologue leads into the tutorial, its sequel does not")
+	_check(StoryData.find(&"prologue").starts_first_adventure and not StoryData.find(&"prologue_2").starts_first_adventure, "story data: the prologue leads into the first adventure, its sequel does not")
 	# 世界観の説明が、プロローグに入っている（通信ログの「声だけが届く」の見出しをやめた代わり）
 	var prologue_text := "".join(StoryData.find(&"prologue").lines.map(func(l: Dictionary) -> String: return l["text"]))
 	_check(prologue_text.contains("声だけ") and prologue_text.contains("耳飾り") and prologue_text.contains("ノート"), "story data: the prologue explains the voice-only earring and the notebook")
@@ -791,15 +795,15 @@ func _test_story_director() -> void:
 	_reset_session()
 	GameSession.story_enabled = true
 	_check(StoryDirector.next_for_prep().id == &"prologue", "director: the prologue comes first")
-	_check(not StoryDirector.pending_tutorial(), "director: the tutorial is not pending before the prologue")
+	_check(not StoryDirector.pending_first_adventure(), "director: the first adventure is not pending before the prologue")
 	_check(StoryDirector.intro_for_depart(SampleData.MERCENARY) == null, "director: no intro before the opening is over")
 	GameSession.mark_seen(&"prologue")
-	_check(StoryDirector.next_for_prep() == null, "director: nothing is due while the tutorial adventure is still ahead")
-	_check(StoryDirector.pending_tutorial(), "director: the tutorial adventure is pending after the prologue")
-	GameSession.mark_seen(&"tutorial")
-	_check(not StoryDirector.pending_tutorial(), "director: the tutorial is no longer pending once done")
+	_check(StoryDirector.next_for_prep() == null, "director: nothing is due while the first adventure is still ahead")
+	_check(StoryDirector.pending_first_adventure(), "director: the first adventure is pending after the prologue")
+	GameSession.mark_seen(&"first_adventure")
+	_check(not StoryDirector.pending_first_adventure(), "director: the first adventure is no longer pending once done")
 	var sequel := StoryDirector.next_for_prep()
-	_check(sequel != null and sequel.id == &"prologue_2", "director: the sequel of the prologue follows the tutorial")
+	_check(sequel != null and sequel.id == &"prologue_2", "director: the sequel of the prologue follows the first adventure")
 	GameSession.mark_seen(&"prologue_2")
 	_check(StoryDirector.next_for_prep() == null, "director: the opening is over")
 	_check(StoryDirector.intro_for_depart(SampleData.CHILDHOOD) == null, "director: the childhood friend needs no intro (the tutorial covered her)")
@@ -915,28 +919,28 @@ func _test_story_in_prep() -> void:
 	root.add_child(first)
 	await _frames(4)
 	_check(GameSession.last_destination == StoryDirector.STORY_SCENE and GameSession.story_scene == &"prologue", "prep story: the prologue plays on the first launch")
-	_check(GameSession.tutorial_active and GameSession.story_next == PrepScreen.MATCHING_SCENE, "prep story: the prologue leads into the tutorial adventure")
+	_check(GameSession.first_adventure_active and GameSession.story_next == PrepScreen.MATCHING_SCENE, "prep story: the prologue leads into the first adventure adventure")
 	first.queue_free()
 	await _frames(2)
 
 	# プロローグのあと、チュートリアルが終わっていなければ、そこから再開する
-	GameSession.tutorial_active = false
+	GameSession.first_adventure_active = false
 	GameSession.mark_seen(&"prologue")
 	GameSession.last_destination = ""
 	var resume: PrepScreen = load("res://scenes/prep_screen.tscn").instantiate()
 	root.add_child(resume)
 	await _frames(4)
-	_check(GameSession.last_destination == PrepScreen.MATCHING_SCENE and GameSession.tutorial_active, "prep story: an unfinished tutorial resumes")
+	_check(GameSession.last_destination == PrepScreen.MATCHING_SCENE and GameSession.first_adventure_active, "prep story: an unfinished first adventure resumes")
 	resume.queue_free()
 	await _frames(2)
 	# チュートリアルが終わると、プロローグのつづきが出る
-	GameSession.tutorial_active = false
-	GameSession.mark_seen(&"tutorial")
+	GameSession.first_adventure_active = false
+	GameSession.mark_seen(&"first_adventure")
 	GameSession.last_destination = ""
 	var sequel_prep: PrepScreen = load("res://scenes/prep_screen.tscn").instantiate()
 	root.add_child(sequel_prep)
 	await _frames(4)
-	_check(GameSession.story_scene == &"prologue_2" and GameSession.story_next == PrepScreen.PREP_SCENE, "prep story: the sequel plays after the tutorial")
+	_check(GameSession.story_scene == &"prologue_2" and GameSession.story_next == PrepScreen.PREP_SCENE, "prep story: the sequel plays after the first adventure")
 	sequel_prep.queue_free()
 	await _frames(2)
 

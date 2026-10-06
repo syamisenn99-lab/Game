@@ -41,8 +41,8 @@ static func _available(scene: StoryScene) -> bool:
 
 
 ## プロローグは見たが、チュートリアルの冒険がまだ終わっていないか（途中でやめた場合は、そこから再開する）
-static func pending_tutorial() -> bool:
-	return GameSession.has_seen(&"prologue") and not GameSession.has_seen(&"tutorial")
+static func pending_first_adventure() -> bool:
+	return GameSession.has_seen(&"prologue") and not GameSession.has_seen(&"first_adventure")
 
 
 ## 場面を再生する。終わったら next_path のシーンへ進む。
@@ -51,13 +51,13 @@ static func play(tree: SceneTree, scene_id: StringName, next_path: String) -> vo
 	var scene := StoryData.find(scene_id)
 	GameSession.story_scene = scene_id
 	GameSession.story_next = next_path
-	if scene != null and scene.starts_tutorial and not GameSession.has_seen(&"tutorial"):
-		GameSession.tutorial_active = true
+	if scene != null and scene.starts_first_adventure and not GameSession.has_seen(&"first_adventure"):
+		GameSession.first_adventure_active = true
 		GameSession.story_next = MATCHING_SCENE
 	GameSession.go_to(tree, STORY_SCENE)
 
 
 ## チュートリアルの冒険を始める（プロローグのあと、または途中から再開するとき）
-static func start_tutorial(tree: SceneTree) -> void:
-	GameSession.tutorial_active = true
+static func start_first_adventure(tree: SceneTree) -> void:
+	GameSession.first_adventure_active = true
 	GameSession.go_to(tree, MATCHING_SCENE)

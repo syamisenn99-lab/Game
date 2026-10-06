@@ -39,6 +39,8 @@ var _cmd_panel: PanelContainer
 var _cmd_pulse: Tween
 var _cmd_hint_active := false
 var _tab_base_titles: Array[String] = []
+var _last_whole_sec := 99
+var _mute_button: Button
 
 
 func _ready() -> void:
@@ -58,6 +60,7 @@ func _process(delta: float) -> void:
 	if _phase != Phase.REPORTING:
 		return
 	_advance_typewriter(delta)
+	_warn_low_time()
 	if state.tick(delta):
 		_line_label.text = "（時間切れ…！ 指示が間に合わなかった）"
 		_resolve(&"")
@@ -104,6 +107,11 @@ func _build_ui() -> void:
 	_time_label = _desk_label("")
 	_time_label.custom_minimum_size = Vector2(64, 0)
 	top.add_child(_time_label)
+	_mute_button = Button.new()
+	_mute_button.text = Sfx.mute_button_text()
+	_mute_button.custom_minimum_size = Vector2(96, 32)
+	_mute_button.pressed.connect(_on_mute_pressed)
+	top.add_child(_mute_button)
 
 	# 中央: 通信ログ（左）とノート（右）
 	var middle := HBoxContainer.new()
@@ -170,7 +178,7 @@ func _build_ui() -> void:
 	cmd.add_child(cmd_spacer)
 	_next_button = Button.new()
 	_next_button.custom_minimum_size = Vector2(140, 40)
-	_next_button.pressed.connect(_start_next_event)
+	_next_button.pressed.connect(_on_next_pressed)
 	cmd.add_child(_next_button)
 
 	_line_label = Label.new()
@@ -227,6 +235,7 @@ func _start_next_event() -> void:
 		return
 	_phase = Phase.REPORTING
 	_selected_chip = null
+	_last_whole_sec = 99
 	_set_command_hint(false)
 	for view: NoteEntryView in _entry_views.values():
 		view.show_stamp(false)
@@ -284,8 +293,12 @@ func _build_report() -> void:
 func _advance_typewriter(delta: float) -> void:
 	if _revealed >= _total_chars:
 		return
+	var before := int(_revealed)
 	_revealed = minf(float(_total_chars), _revealed + state.adventurer.chars_per_sec * delta)
 	_apply_reveal()
+	# 2文字ごとに、ごく小さな音を鳴らす
+	if int(_revealed) / 2 > before / 2:
+		Sfx.play(&"type")
 
 
 func _reveal_all() -> void:
@@ -364,6 +377,8 @@ func _announce_known_note() -> void:
 	view.show_stamp(true, true)
 	view.flash(Color(0.7, 1.0, 0.75))
 	view.pop()
+	Sfx.play(&"stamp")
+	Sfx.play(&"known")
 	var slot_at := view.get_global_rect().get_center()
 	if view.slots.has(blank_id):
 		var slot := view.slots[blank_id] as BlankSlot
@@ -378,7 +393,10 @@ func _set_command_hint(active: bool) -> void:
 	if _cmd_pulse != null:
 		_cmd_pulse.kill()
 		_cmd_pulse = null
+	var was_active := _cmd_hint_active
 	_cmd_hint_active = active
+	if active and not was_active:
+		Sfx.play_later(self, &"ting", 0.3)
 	if active:
 		var sb := Palette.box(Palette.PAPER, Color("e0a800"), 4, 6, 12.0)
 		sb.shadow_color = Color(1.0, 0.85, 0.2, 0.85)
@@ -412,6 +430,7 @@ func _on_log_gui_input(event: InputEvent) -> void:
 func _on_chip_clicked(chip: KeywordChip) -> void:
 	if _phase != Phase.REPORTING:
 		return
+	Sfx.play(&"grab")
 	var was_selected := chip == _selected_chip
 	_deselect_chip()
 	if not was_selected:
@@ -449,6 +468,8 @@ func _on_keyword_dropped(keyword_id: StringName, target_id: StringName) -> void:
 					slot.set_filled(true)
 					slot.pop()
 					at = slot.get_global_rect().get_center()
+			Sfx.play(&"stamp")
+			Sfx.play(&"fix" if state.is_fix(target_id) else &"match")
 			Effects.burst(_overlay, at, Palette.HILITE_BG, 32)
 			Effects.burst(_overlay, at, Palette.OK, 14)
 			Effects.float_text(_overlay, "訂正！" if state.is_fix(target_id) else "照合！", at + Vector2(0, -24), Palette.OK)
@@ -461,6 +482,7 @@ func _on_keyword_dropped(keyword_id: StringName, target_id: StringName) -> void:
 			if view != null:
 				view.flash(Color(1.0, 0.6, 0.6))
 				view.wobble()
+			Sfx.play(&"mismatch")
 			Effects.burst(_overlay, at, Palette.NG, 12, false)
 			Effects.float_text(_overlay, "ちがう…", at + Vector2(0, -24), Palette.NG, 26)
 			var bar_end := _timer_bar.get_global_rect().get_center()
@@ -474,7 +496,31 @@ func _view_for_target(target_id: StringName) -> NoteEntryView:
 
 
 func _on_stat_chosen(stat: StringName) -> void:
+	if _phase == Phase.REPORTING:
+		Sfx.play(&"click")
 	_resolve(stat)
+
+
+func _on_next_pressed() -> void:
+	Sfx.play(&"click")
+	_start_next_event()
+
+
+func _on_mute_pressed() -> void:
+	Sfx.set_muted(not Sfx.muted)
+	_mute_button.text = Sfx.mute_button_text()
+	Sfx.play(&"click")
+
+
+## 残り5秒を切ったら、1秒ごとに小さく知らせる
+func _warn_low_time() -> void:
+	if state.resolved:
+		return
+	var whole := int(ceil(state.time_left))
+	if whole != _last_whole_sec:
+		_last_whole_sec = whole
+		if whole <= 5 and whole > 0:
+			Sfx.play(&"warn")
 
 
 # ---------------------------------------------------------------- 判定
@@ -493,13 +539,16 @@ func _resolve(chosen: StringName) -> void:
 	var res := state.resolve(chosen, rng)
 	for i in 10:
 		_dice_label.text = "d20 ... %d" % rng.randi_range(1, Rules.DICE_SIDES)
+		Sfx.play(&"tick", 0.8 + 0.06 * i)
 		await get_tree().create_timer(0.06).timeout
 	_dice_label.text = _format_result(res)
 	var dice_at := _dice_label.get_global_rect().get_center()
 	if res["success"]:
+		Sfx.play(&"success")
 		Effects.burst(_overlay, dice_at, Palette.HILITE_BG, 36)
 		Effects.float_text(_overlay, "成功！", dice_at + Vector2(0, -40), Palette.OK, 36)
 	else:
+		Sfx.play(&"crit_fail" if res["crit_fail"] else &"fail")
 		Effects.burst(_overlay, dice_at, Palette.NG, 16, false)
 		Effects.float_text(_overlay, "大失敗…！" if res["crit_fail"] else "失敗…", dice_at + Vector2(0, -40), Palette.NG, 36)
 	_line_label.text = state.current.success_text if res["success"] else state.current.fail_text
@@ -559,10 +608,14 @@ func _show_summary() -> void:
 	var again := Button.new()
 	again.text = "もう一度"
 	again.custom_minimum_size = Vector2(0, 44)
-	again.pressed.connect(func() -> void: get_tree().reload_current_scene())
+	again.pressed.connect(func() -> void:
+		Sfx.play(&"click")
+		get_tree().reload_current_scene())
 	vbox.add_child(again)
 	var choose := Button.new()
 	choose.text = "ガイドする人を選びなおす"
 	choose.custom_minimum_size = Vector2(0, 44)
-	choose.pressed.connect(func() -> void: get_tree().change_scene_to_file(START_SCENE))
+	choose.pressed.connect(func() -> void:
+		Sfx.play(&"click")
+		get_tree().change_scene_to_file(START_SCENE))
 	vbox.add_child(choose)

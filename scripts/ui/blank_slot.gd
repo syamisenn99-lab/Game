@@ -65,6 +65,7 @@ func set_suspect(value: bool) -> void:
 func _on_mouse_entered() -> void:
 	if not filled and get_viewport().gui_is_dragging():
 		_set_hint(Hint.HOVER)
+		Sfx.play(&"hover")
 
 
 func _on_mouse_exited() -> void:

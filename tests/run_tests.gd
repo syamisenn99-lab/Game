@@ -41,6 +41,10 @@ func _run() -> void:
 	await _test_mercenary_flow()
 	_test_carry_over()
 	await _test_carry_over_ui()
+	_test_sfx_waveforms()
+	await _test_sfx_events()
+	Sfx.shutdown()
+	await _frames(2)
 	print("%d checks, %d failures" % [_checks, _failures])
 	quit(1 if _failures > 0 else 0)
 
@@ -479,6 +483,78 @@ func _test_carry_over_ui() -> void:
 	start.queue_free()
 	await _frames(2)
 	_reset_session()
+
+
+## 合成した効果音の波形（無音・音割れ・プチッというノイズが無いか）
+func _test_sfx_waveforms() -> void:
+	for sound in Sfx.names():
+		var st := Sfx.stream(sound)
+		_check(st != null, "sfx: %s can be synthesized" % sound)
+		if st == null:
+			continue
+		var length := Synth.length_sec(st)
+		var peak := Synth.peak(st)
+		var first := absf(float(st.data.decode_s16(0)) / 32768.0)
+		var last := absf(float(st.data.decode_s16(st.data.size() - 4)) / 32768.0)
+		_check(length >= 0.01 and length <= 1.0, "sfx: %s has a sensible length (%.2fs)" % [sound, length])
+		_check(peak >= 0.05 and peak < 0.98, "sfx: %s is audible but not clipping (peak %.2f)" % [sound, peak])
+		_check(first < 0.05 and last < 0.01, "sfx: %s starts and ends softly (%.3f / %.3f)" % [sound, first, last])
+	_check(Sfx.stream(&"no_such_sound") == null, "sfx: an unknown sound is ignored")
+
+
+## 操作に応じて、正しい効果音が鳴る
+func _test_sfx_events() -> void:
+	_reset_session()
+	Sfx.muted = false
+	var screen: MatchingScreen = load("res://scenes/matching_screen.tscn").instantiate()
+	root.add_child(screen)
+	await _frames(3)
+	screen._reveal_all()
+	await _frames(2)
+
+	Sfx.played_log.clear()
+	screen._on_keyword_dropped(&"mushroom", &"glow_moss")
+	_check(Sfx.played_log.has(&"mismatch") and not Sfx.played_log.has(&"match"), "sfx ui: a wrong drop plays the mismatch sound")
+	Sfx.played_log.clear()
+	screen._on_keyword_dropped(&"mushroom", &"mushroom_poison")
+	_check(Sfx.played_log.has(&"match") and Sfx.played_log.has(&"stamp"), "sfx ui: a right drop plays the chime and the stamp")
+	await create_timer(0.5).timeout
+	_check(Sfx.played_log.has(&"ting"), "sfx ui: the command panel lighting up plays a ting")
+
+	# ミュート中は鳴らない
+	Sfx.set_muted(true)
+	Sfx.played_log.clear()
+	Sfx.play(&"click")
+	_check(Sfx.played_log.is_empty(), "sfx ui: nothing plays while muted")
+	_check(Sfx.mute_button_text() == "音: OFF", "sfx ui: the mute button label follows the setting")
+	Sfx.set_muted(false)
+
+	Sfx.played_log.clear()
+	screen._on_stat_chosen(&"evade")
+	await create_timer(1.2).timeout
+	var ticks := Sfx.played_log.filter(func(n: StringName) -> bool: return n == &"tick").size()
+	_check(Sfx.played_log.has(&"click") and ticks == 10, "sfx ui: choosing a command clicks and the dice rattle (%d ticks)" % ticks)
+	_check(Sfx.played_log.has(&"success") or Sfx.played_log.has(&"fail") or Sfx.played_log.has(&"crit_fail"), "sfx ui: the result has its own sound")
+
+	# 以前に埋めたノートが効くイベント: ノートが役に立った音
+	GameSession.filled_blanks[&"beast_aversion"] = true
+	Sfx.played_log.clear()
+	screen._start_next_event()
+	await create_timer(0.6).timeout
+	_check(screen.state.auto_matched and Sfx.played_log.has(&"known"), "sfx ui: a pre-matched event plays the known-note sound")
+
+	# 残り5秒を切ると、1秒ごとに知らせる
+	screen.state.resolved = true
+	screen._start_next_event()
+	await _frames(2)
+	Sfx.played_log.clear()
+	screen.state.time_left = 4.5
+	await _frames(3)
+	_check(Sfx.played_log.has(&"warn"), "sfx ui: a low-time warning ticks")
+	screen.queue_free()
+	await _frames(2)
+	_reset_session()
+	Sfx.muted = false
 
 
 ## 実際のマウス入力（押す→動かす→離す）でドラッグ＆ドロップできるか。

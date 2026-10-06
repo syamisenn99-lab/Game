@@ -8,6 +8,7 @@ const STAT_ORDER: Array[StringName] = [&"battle", &"explore", &"evade"]
 var cards: Dictionary = {}
 var notebook_label: Label
 var reset_button: Button
+var mute_button: Button
 var _reset_armed := false
 
 
@@ -59,6 +60,14 @@ func _ready() -> void:
 	reset_button.custom_minimum_size = Vector2(300, 40)
 	reset_button.pressed.connect(request_reset)
 	footer.add_child(reset_button)
+	mute_button = Button.new()
+	mute_button.text = Sfx.mute_button_text()
+	mute_button.custom_minimum_size = Vector2(96, 40)
+	mute_button.pressed.connect(func() -> void:
+		Sfx.set_muted(not Sfx.muted)
+		mute_button.text = Sfx.mute_button_text()
+		Sfx.play(&"click"))
+	footer.add_child(mute_button)
 	_refresh_notebook_info()
 
 
@@ -126,6 +135,7 @@ func _refresh_notebook_info() -> void:
 
 ## ノートのリセット。誤って消さないよう、2回押して確定する。
 func request_reset() -> void:
+	Sfx.play(&"click")
 	if not _reset_armed:
 		_reset_armed = true
 	else:
@@ -137,5 +147,6 @@ func request_reset() -> void:
 ## 冒険者を選んで探索へ。テストでは go=false にしてシーン遷移を避ける。
 func select(id: StringName, go: bool = true) -> void:
 	GameSession.adventurer_id = id
+	Sfx.play(&"select")
 	if go:
 		get_tree().change_scene_to_file(MATCHING_SCENE)

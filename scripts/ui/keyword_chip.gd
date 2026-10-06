@@ -54,6 +54,7 @@ func _get_drag_data(_at_position: Vector2) -> Variant:
 	preview.add_child(label)
 	preview.rotation = deg_to_rad(-3.0)
 	set_drag_preview(preview)
+	Sfx.play(&"grab")
 	return {"type": "keyword", "id": keyword_id, "text": display_text}
 
 

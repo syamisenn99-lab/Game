@@ -152,7 +152,7 @@ func _build_ui() -> void:
 	var log_vbox := VBoxContainer.new()
 	log_panel.add_child(log_vbox)
 	var log_title := Label.new()
-	log_title.text = "通信ログ（声だけが届く）"
+	log_title.text = "通信ログ"
 	log_title.add_theme_color_override("font_color", Palette.INK_FAINT)
 	log_vbox.add_child(log_title)
 	# 長い報告でも、画面全体が押し広げられないように、ログはスクロールできる枠に入れる

@@ -5,9 +5,18 @@ extends Control
 const MATCHING_SCENE := "res://scenes/matching_screen.tscn"
 const STAT_ORDER: Array[StringName] = [&"battle", &"explore", &"evade"]
 const GOLD := Color("e0a800")
+## 能力ごとのバーの色（戦闘＝赤、探索＝青、回避＝緑）
+const STAT_COLORS := {
+	&"battle": Color("c0392b"),
+	&"explore": Color("2f6fb5"),
+	&"evade": Color("3c8d5a"),
+}
+const STAT_MAX := 5
 
 var cards: Dictionary = {}
 var select_buttons: Dictionary = {}
+## 冒険者id -> {能力 -> 塗られたマスの数}（テスト用）
+var stat_values: Dictionary = {}
 ## ShopItem.id -> {"panel": PanelContainer, "button": Button}
 var shop_rows: Dictionary = {}
 var day_label: Label
@@ -187,14 +196,40 @@ func _build_adventurer_card(adventurer: Adventurer) -> PanelContainer:
 	button.pressed.connect(choose.bind(adventurer.id))
 	head.add_child(button)
 	select_buttons[adventurer.id] = button
+	vbox.add_child(_build_stat_bars(adventurer))
 	vbox.add_child(_small(adventurer.tagline, Palette.INK))
 	vbox.add_child(_small("報告のクセ: " + adventurer.report_style, Palette.INK_FAINT))
-	var stats: Array[String] = []
+	return card
+
+
+## 戦闘・探索・回避の能力を、色分けした5マスのバーで見せる。いちばん高い能力の名前は太字にする
+func _build_stat_bars(adventurer: Adventurer) -> Control:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 14)
+	var best := 0
+	for stat in STAT_ORDER:
+		best = maxi(best, adventurer.stat_for(stat))
+	stat_values[adventurer.id] = {}
 	for stat in STAT_ORDER:
 		var value := adventurer.stat_for(stat)
-		stats.append("%s %s%s" % [Rules.STAT_LABELS[stat], "■".repeat(value), "□".repeat(maxi(0, 5 - value))])
-	vbox.add_child(_small("　".join(stats), Palette.INK))
-	return card
+		stat_values[adventurer.id][stat] = value
+		var cell := VBoxContainer.new()
+		cell.add_theme_constant_override("separation", 2)
+		row.add_child(cell)
+		var name_label := Label.new()
+		name_label.text = Rules.STAT_LABELS[stat]
+		name_label.add_theme_font_size_override("font_size", 18)
+		name_label.add_theme_color_override("font_color", STAT_COLORS[stat] if value == best else Palette.INK_FAINT)
+		cell.add_child(name_label)
+		var bar := HBoxContainer.new()
+		bar.add_theme_constant_override("separation", 2)
+		cell.add_child(bar)
+		for i in STAT_MAX:
+			var segment := ColorRect.new()
+			segment.custom_minimum_size = Vector2(13, 13)
+			segment.color = STAT_COLORS[stat] if i < value else Color(0.78, 0.72, 0.58)
+			bar.add_child(segment)
+	return row
 
 
 func _small(text: String, color: Color) -> Label:

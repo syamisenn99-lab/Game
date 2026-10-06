@@ -384,6 +384,15 @@ func _test_start_screen() -> void:
 	screen.choose(SampleData.CHILDHOOD)
 	_check(GameSession.adventurer_id == SampleData.CHILDHOOD, "prep: the choice can be changed")
 	_check(screen.day_label.text == "1日目" and screen.funds_label.text.contains("200"), "prep: day and funds are shown (%s / %s)" % [screen.day_label.text, screen.funds_label.text])
+	# 能力のバー: 冒険者ごとに、戦闘・探索・回避の値が、そのまま塗られたマスの数になる
+	for adventurer in SampleData.adventurers():
+		for stat in PrepScreen.STAT_ORDER:
+			_check(screen.stat_values[adventurer.id][stat] == adventurer.stat_for(stat), "prep: %s %s bar matches the stat" % [adventurer.id, stat])
+	var merc_card: PanelContainer = screen.cards[SampleData.MERCENARY]
+	var segments := merc_card.find_children("*", "ColorRect", true, false)
+	_check(segments.size() == 15, "prep: each card draws three bars of five squares (%d)" % segments.size())
+	var filled := segments.filter(func(c: ColorRect) -> bool: return c.color in PrepScreen.STAT_COLORS.values())
+	_check(filled.size() == 5 + 2 + 3, "prep: the mercenary's bars are filled 5 / 2 / 3 (%d)" % filled.size())
 	_check(screen.shop_rows.size() == 10, "prep: eight pieces of information and two items are for sale (%d)" % screen.shop_rows.size())
 	screen.queue_free()
 	await _frames(2)

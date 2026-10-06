@@ -159,7 +159,16 @@ func _build_adventurer_card(adventurer: Adventurer) -> PanelContainer:
 	vbox.add_theme_constant_override("separation", 4)
 	card.add_child(vbox)
 	var head := HBoxContainer.new()
+	head.add_theme_constant_override("separation", 10)
 	vbox.add_child(head)
+	var portrait := Illustrations.find("portraits", adventurer.id)
+	if portrait != null:
+		var face := TextureRect.new()
+		face.texture = portrait
+		face.custom_minimum_size = Vector2(72, 72)
+		face.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		face.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		head.add_child(face)
 	var name_label := Label.new()
 	name_label.text = adventurer.display_name
 	name_label.add_theme_font_size_override("font_size", 28)

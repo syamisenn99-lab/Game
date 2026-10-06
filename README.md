@@ -16,6 +16,10 @@
 
 > 日本語表示はOSのフォントへのフォールバックに頼っている。エクスポートして配布する前に、日本語フォントを同梱すること。
 
+## イラスト
+
+絵の置き場所と差し替え方は [assets/illustrations/README.md](assets/illustrations/README.md)。いまの絵は仮の絵（ヘタウマ風のSVG）で、同じ名前の `.png` を置けば置き換わる。
+
 ## テスト
 
 ```sh
@@ -31,4 +35,6 @@ godot --headless --path . --script tests/run_tests.gd    # 判定ロジック・
 | `scripts/core/rules.gd` | バランス数値を集約した定義（仮の初期値） |
 | `scripts/data/` | ノート項目・イベント・冒険者の Resource と、サンプルシナリオ |
 | `scripts/ui/` | 照合画面、キーワードチップ、ノート項目、虫食い穴 |
+| `assets/illustrations/` | イラスト（仮の絵）。差し替え方は同フォルダの README |
+| `tools/` | 仮の絵を作るスクリプト |
 | `tests/` | ヘッドレステスト |

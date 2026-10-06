@@ -250,10 +250,20 @@ static func _entry(id: StringName, page: StringName, title: String, body: String
 	return e
 
 
+## イベントごとの冒険者のスケッチ（絵の名前）。絵のファイルが無ければ、何も表示されない
+const SKETCHES := {
+	&"e1_mushroom": &"mushroom", &"e2_beast": &"beast", &"e3_statue": &"statue", &"e4_beast_again": &"beast",
+	&"e5_moss": &"moss", &"e6_pit_sign": &"pit", &"e7_pit_depth": &"pit_deep",
+	&"m1_bats": &"bat", &"m2_beast": &"beast", &"m3_pattern": &"pattern", &"m4_statue": &"statue",
+	&"m5_bats_again": &"bat", &"m6_tablet": &"tablet",
+}
+
+
 static func _event(id: StringName, report: String, stat: StringName, base: int,
 		targets: Dictionary, correct_line: String, success: String, fail: String) -> EventDef:
 	var ev := EventDef.new()
 	ev.id = id
+	ev.sketch = SKETCHES.get(id, &"")
 	ev.report = report
 	ev.required_stat = stat
 	ev.base_target = base

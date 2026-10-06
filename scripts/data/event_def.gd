@@ -15,3 +15,5 @@ extends Resource
 @export var known_line: String
 @export var success_text: String
 @export var fail_text: String
+## 冒険者のスケッチ（assets/illustrations/sketches/<この名前>.png）。空なら絵なし
+@export var sketch: StringName

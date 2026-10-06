@@ -42,6 +42,8 @@ func _run() -> void:
 	await _test_mercenary_flow()
 	_test_carry_over()
 	await _test_carry_over_ui()
+	_test_illustrations()
+	await _test_illustrations_ui()
 	_test_sfx_waveforms()
 	await _test_sfx_events()
 	Sfx.shutdown()
@@ -580,6 +582,63 @@ func _test_carry_over_ui() -> void:
 	start.request_reset()
 	_check(GameSession.filled_blanks.is_empty() and GameSession.funds == Rules.START_FUNDS and start.notebook_label.text.contains("0 / 6"), "carry ui: the second press resets everything")
 	start.queue_free()
+	await _frames(2)
+	_reset_session()
+
+
+## 絵の読み込み口
+func _test_illustrations() -> void:
+	Illustrations.clear_cache()
+	var paths := Illustrations.candidate_paths("sketches", &"beast", &"mercenary")
+	_check(paths[0].ends_with("/sketches/mercenary/beast.png") and paths[4].ends_with("/sketches/beast.png"), "art: the adventurer's own drawing is searched first")
+	_check(paths[0].ends_with(".png") and paths[3].ends_with(".svg"), "art: png is preferred over svg (%s)" % paths[3])
+	for id in [&"mushroom", &"beast", &"statue", &"moss", &"pit", &"pit_deep", &"bat", &"pattern", &"tablet"]:
+		_check(Illustrations.find("sketches", id) != null, "art: sketch %s is available" % id)
+	for id in [SampleData.CHILDHOOD, SampleData.MERCENARY]:
+		_check(Illustrations.find("portraits", id) != null, "art: portrait %s is available" % id)
+	_check(Illustrations.find("sketches", &"no_such_drawing") == null, "art: a missing drawing is just null")
+	_check(Illustrations.find("sketches", &"") == null, "art: an empty id is null")
+	# どのイベントのスケッチも、絵のファイルがある
+	for adventurer_id in [SampleData.CHILDHOOD, SampleData.MERCENARY]:
+		for ev in SampleData.events(adventurer_id):
+			_check(ev.sketch != &"" and Illustrations.find("sketches", ev.sketch, adventurer_id) != null, "art: event %s has its sketch" % ev.id)
+
+
+## 絵が画面に出る（通信ログのスケッチ、顔）
+func _test_illustrations_ui() -> void:
+	_reset_session()
+	var screen: MatchingScreen = load("res://scenes/matching_screen.tscn").instantiate()
+	root.add_child(screen)
+	await _frames(3)
+	_check(screen._portrait_rect.visible and screen._portrait_rect.texture != null, "art ui: the adventurer's face is in the header")
+	_check(screen._sketch_frame != null and screen._sketch_frame.modulate.a == 0.0, "art ui: the sketch is hidden while the report is still being typed")
+	screen._reveal_all()
+	await create_timer(0.7).timeout
+	_check(screen._sketch_frame.modulate.a > 0.99, "art ui: the sketch fades in when the report is complete")
+	screen.state.resolved = true
+	screen._start_next_event()
+	await _frames(3)
+	_check(screen._sketch_frame != null and screen._sketch_frame.modulate.a == 0.0, "art ui: the next event starts with a fresh, hidden sketch")
+	# 絵のファイルが無いイベントでも壊れない（何も出ないだけ）
+	screen.state.events[screen.state.event_index + 1].sketch = &"no_such_drawing"
+	screen.state.resolved = true
+	screen._start_next_event()
+	await _frames(3)
+	screen._reveal_all()
+	await _frames(2)
+	_check(screen._sketch_frame == null and screen._phase == MatchingScreen.Phase.REPORTING, "art ui: an event without a drawing simply shows none")
+	screen.queue_free()
+	await _frames(2)
+
+	var prep: PrepScreen = load("res://scenes/prep_screen.tscn").instantiate()
+	root.add_child(prep)
+	await _frames(3)
+	var faces := 0
+	for card: PanelContainer in prep.cards.values():
+		for node in card.find_children("*", "TextureRect", true, false):
+			faces += 1
+	_check(faces == 2, "art ui: both adventurer cards show a face (%d)" % faces)
+	prep.queue_free()
 	await _frames(2)
 	_reset_session()
 

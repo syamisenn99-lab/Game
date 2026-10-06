@@ -40,6 +40,10 @@ var _cmd_pulse: Tween
 var _cmd_hint_active := false
 var _tab_base_titles: Array[String] = []
 var _last_whole_sec := 99
+var _portrait_rect: TextureRect
+## 冒険者のスケッチ（絵のファイルがあるときだけ）。文字送りが終わったら、ふわっと出る
+var _sketch_frame: Control
+var _sketch_shown := false
 var _mute_button: Button
 ## 探索終了時の精算の結果（GameSession.settle の戻り値）
 var settlement: Dictionary = {}
@@ -59,6 +63,10 @@ func _ready() -> void:
 	if GameSession.has_item(&"sticky"):
 		state.penalty_scale = Rules.STICKY_PENALTY_SCALE
 	_name_label.text = "通信中: %s" % state.adventurer.display_name
+	var portrait := Illustrations.find("portraits", adventurer.id)
+	if portrait != null:
+		_portrait_rect.texture = portrait
+		_portrait_rect.visible = true
 	_build_notebook()
 	_start_next_event()
 
@@ -98,6 +106,12 @@ func _build_ui() -> void:
 	var top := HBoxContainer.new()
 	top.add_theme_constant_override("separation", 16)
 	root.add_child(top)
+	_portrait_rect = TextureRect.new()
+	_portrait_rect.custom_minimum_size = Vector2(44, 44)
+	_portrait_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_portrait_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_portrait_rect.visible = false
+	top.add_child(_portrait_rect)
 	_name_label = _desk_label("")
 	top.add_child(_name_label)
 	_event_label = _desk_label("")
@@ -268,6 +282,8 @@ func _build_report() -> void:
 	_chips.clear()
 	_revealed = 0.0
 	_total_chars = 0
+	_sketch_frame = null
+	_sketch_shown = false
 
 	var flow := HFlowContainer.new()
 	flow.add_theme_constant_override("h_separation", 0)
@@ -296,6 +312,13 @@ func _build_report() -> void:
 				_report_nodes.append({"node": label, "offset": _total_chars})
 				_total_chars += 1
 
+	# 冒険者のスケッチ（絵のファイルがあれば）
+	var sketch := Illustrations.find("sketches", state.current.sketch, state.adventurer.id)
+	if sketch != null:
+		_sketch_frame = _make_sketch_frame(sketch)
+		_sketch_frame.modulate.a = 0.0
+		_log_box.add_child(_sketch_frame)
+
 
 func _advance_typewriter(delta: float) -> void:
 	if _revealed >= _total_chars:
@@ -306,11 +329,47 @@ func _advance_typewriter(delta: float) -> void:
 	# 2文字ごとに、ごく小さな音を鳴らす
 	if int(_revealed) / 2 > before / 2:
 		Sfx.play(&"type")
+	if _revealed >= _total_chars:
+		_show_sketch()
 
 
 func _reveal_all() -> void:
 	_revealed = float(_total_chars)
 	_apply_reveal()
+	_show_sketch()
+
+
+## 冒険者の描いたスケッチを、紙に貼ったように見せる
+func _make_sketch_frame(texture: Texture2D) -> Control:
+	var frame := PanelContainer.new()
+	frame.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	frame.add_theme_stylebox_override("panel", Palette.box(Color("fbf6e6"), Palette.INK_FAINT, 2, 4, 8.0))
+	var vbox := VBoxContainer.new()
+	vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	frame.add_child(vbox)
+	var picture := TextureRect.new()
+	picture.texture = texture
+	picture.custom_minimum_size = Vector2(288, 216)
+	picture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	picture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	picture.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	vbox.add_child(picture)
+	var caption := Label.new()
+	caption.text = "%sのスケッチ" % state.adventurer.display_name
+	caption.add_theme_font_size_override("font_size", 15)
+	caption.add_theme_color_override("font_color", Palette.INK_FAINT)
+	caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	caption.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	vbox.add_child(caption)
+	return frame
+
+
+func _show_sketch() -> void:
+	if _sketch_frame == null or _sketch_shown:
+		return
+	_sketch_shown = true
+	create_tween().tween_property(_sketch_frame, "modulate:a", 1.0, 0.5)
 
 
 func _apply_reveal() -> void:

@@ -13,18 +13,18 @@ static func adventurer() -> Adventurer:
 static func entries() -> Array[NoteEntry]:
 	var list: Array[NoteEntry] = []
 	list.append(_entry(&"mushroom_poison", &"plants", "毒キノコの見分け方",
-		"傘に青い斑点があるものは猛毒。触れただけでも手がかぶれるらしい。"))
+		"傘に青い斑点があるものは猛毒。触れただけでも手がかぶれるらしい。傘の裏のひだまで目でよく確かめれば見分けられる（観察）。"))
 	list.append(_entry(&"glow_moss", &"plants", "光る苔",
-		"暗い通路で光る苔は食べられる。苦味が強い。", {}, 0))
+		"暗い通路で光る苔は食べられる。苦味が強い。毒のある苔と似ているので、種類の知識がないと見分けにくい（知識）。", {}, 0))
 	list.append(_entry(&"beast_claw", &"monsters", "鋭い爪の獣（第2層）",
-		"爪で獲物を引き裂く。{blank:beast_aversion}を極端に嫌うらしい。",
+		"爪で獲物を引き裂く。{blank:beast_aversion}を極端に嫌うらしい。怯んだ隙に押し返すなら、力勝負になる（戦闘）。",
 		{&"beast_aversion": "火"}, 0))
 	list.append(_entry(&"cave_bat", &"monsters", "岩穴の蝙蝠",
-		"群れで天井に張りつく。大きな音に弱い。"))
+		"群れで天井に張りつく。大きな音に弱い。飛び立っても慌てず、気持ちを落ち着けることが大事（精神）。"))
 	list.append(_entry(&"statue_trap", &"traps", "石像の罠",
-		"目が光る石像は台座に隠しスイッチがある。見つけて押せば止まる。壊そうとすると作動する。"))
+		"目が光る石像は台座に隠しスイッチがある。見つけて押せば止まる。壊そうとすると作動する。台座は目でよく探すこと（観察）。"))
 	list.append(_entry(&"pit_trap", &"traps", "落とし穴",
-		"床の色が違う場所は踏まないこと。"))
+		"床の色が違う場所は踏まないこと。古い遺跡の造りを知っていれば見抜ける（知識）。"))
 	return list
 
 

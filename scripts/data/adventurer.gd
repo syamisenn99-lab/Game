@@ -2,7 +2,7 @@ class_name Adventurer
 extends Resource
 
 @export var display_name: String
-## battle / observe / knowledge / spirit -> 値
+## battle / explore / evade -> 値
 @export var stats: Dictionary = {}
 
 

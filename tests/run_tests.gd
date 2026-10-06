@@ -49,11 +49,11 @@ func _test_note_entry() -> void:
 
 
 func _test_judge() -> void:
-	_check(Judge.modifier(true, &"observe", &"observe") == -4, "judge: matched+correct")
-	_check(Judge.modifier(true, &"battle", &"observe") == 0, "judge: matched+wrong stat")
-	_check(Judge.modifier(false, &"observe", &"observe") == 0, "judge: unmatched+correct")
-	_check(Judge.modifier(false, &"battle", &"observe") == 4, "judge: unmatched+wrong")
-	_check(Judge.modifier(false, &"", &"observe") == 2, "judge: no instruction")
+	_check(Judge.modifier(true, &"explore", &"explore") == -4, "judge: matched+correct")
+	_check(Judge.modifier(true, &"battle", &"explore") == 0, "judge: matched+wrong stat")
+	_check(Judge.modifier(false, &"explore", &"explore") == 0, "judge: unmatched+correct")
+	_check(Judge.modifier(false, &"battle", &"explore") == 4, "judge: unmatched+wrong")
+	_check(Judge.modifier(false, &"", &"explore") == 2, "judge: no instruction")
 	var r := Judge.resolve(12, -4, 4, 5)
 	_check(r["target"] == 8 and r["total"] == 9 and r["success"], "judge: success by total")
 	_check(not Judge.resolve(12, 0, 4, 1)["success"], "judge: natural 1 always fails")
@@ -133,7 +133,7 @@ func _test_ui_flow() -> void:
 	screen._on_keyword_dropped(&"mushroom", &"mushroom_poison")
 	_check(screen.state.matched, "ui: matched after correct drop")
 	_check((screen._entry_views[&"mushroom_poison"] as NoteEntryView)._stamp.visible, "ui: stamp shown")
-	screen._on_stat_chosen(&"observe")
+	screen._on_stat_chosen(&"evade")
 	await create_timer(1.0).timeout
 	_check(screen._phase == MatchingScreen.Phase.RESULT, "ui: reached result phase")
 	_check(screen._next_button.visible, "ui: next button visible")

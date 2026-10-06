@@ -162,7 +162,7 @@ func _build_ui() -> void:
 	cmd.add_theme_constant_override("separation", 10)
 	bvbox.add_child(cmd)
 	var cmd_label := Label.new()
-	cmd_label.text = "指示（どの力で切り抜ける？）:"
+	cmd_label.text = "指示（どうする？）:"
 	cmd.add_child(cmd_label)
 	for stat in Rules.STATS:
 		var button := Button.new()

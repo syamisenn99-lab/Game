@@ -22,10 +22,10 @@ const INITIAL_REWARD := 300.0
 ## タイプライター表示の速度（文字/秒）
 const CHARS_PER_SEC := 25.0
 
-const STATS: Array[StringName] = [&"battle", &"observe", &"knowledge", &"spirit"]
+## 指示（＝判定に使う能力値）。MVP では戦闘・探索・回避の3つに絞る
+const STATS: Array[StringName] = [&"battle", &"explore", &"evade"]
 const STAT_LABELS := {
 	&"battle": "戦闘",
-	&"observe": "観察",
-	&"knowledge": "知識",
-	&"spirit": "精神",
+	&"explore": "探索",
+	&"evade": "回避",
 }

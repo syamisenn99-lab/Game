@@ -1,0 +1,292 @@
+class_name PrepScreen
+extends Control
+## 準備フェーズ: 誰をガイドするか選び、情報や道具を買って、探索に出発する（ゲームの入口）。
+
+const MATCHING_SCENE := "res://scenes/matching_screen.tscn"
+const STAT_ORDER: Array[StringName] = [&"battle", &"explore", &"evade"]
+const GOLD := Color("e0a800")
+
+var cards: Dictionary = {}
+var select_buttons: Dictionary = {}
+## ShopItem.id -> {"panel": PanelContainer, "button": Button}
+var shop_rows: Dictionary = {}
+var day_label: Label
+var funds_label: Label
+var living_label: Label
+var notebook_label: Label
+var warning_label: Label
+var depart_button: Button
+var reset_button: Button
+var mute_button: Button
+var _reset_armed := false
+var _offers: Array[ShopItem] = []
+var _items: Array[ShopItem] = []
+
+
+func _ready() -> void:
+	GameSession.load_notebook()
+	theme = Palette.make_theme()
+	_offers = SampleData.info_offers()
+	_items = SampleData.items()
+	_build_ui()
+	_refresh()
+
+
+# ---------------------------------------------------------------- 画面構築
+
+func _build_ui() -> void:
+	var desk := ColorRect.new()
+	desk.color = Palette.DESK
+	desk.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(desk)
+
+	var margin := MarginContainer.new()
+	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+	for side in ["left", "right", "top", "bottom"]:
+		margin.add_theme_constant_override("margin_" + side, 20)
+	add_child(margin)
+	var root := VBoxContainer.new()
+	root.add_theme_constant_override("separation", 12)
+	margin.add_child(root)
+
+	# 上部: 日数と資金
+	var top := HBoxContainer.new()
+	top.add_theme_constant_override("separation", 24)
+	root.add_child(top)
+	var title := _desk_label("準備", 36)
+	top.add_child(title)
+	day_label = _desk_label("", 24)
+	top.add_child(day_label)
+	funds_label = _desk_label("", 24)
+	funds_label.add_theme_color_override("font_color", GOLD)
+	top.add_child(funds_label)
+	living_label = _desk_label("", 20)
+	top.add_child(living_label)
+
+	# 中央: 3つの棚
+	var middle := HBoxContainer.new()
+	middle.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	middle.add_theme_constant_override("separation", 14)
+	root.add_child(middle)
+
+	var guide_box := _shelf("ガイドする人", 1.5)
+	middle.add_child(guide_box["panel"])
+	for adventurer in SampleData.adventurers():
+		var card := _build_adventurer_card(adventurer)
+		(guide_box["list"] as VBoxContainer).add_child(card)
+		cards[adventurer.id] = card
+
+	var info_box := _shelf("情報を買う（ノートが育つ）", 1.0)
+	middle.add_child(info_box["panel"])
+	for offer in _offers:
+		(info_box["list"] as VBoxContainer).add_child(_build_shop_row(offer))
+
+	var item_box := _shelf("道具を買う", 0.85)
+	middle.add_child(item_box["panel"])
+	for item in _items:
+		(item_box["list"] as VBoxContainer).add_child(_build_shop_row(item))
+	notebook_label = Label.new()
+	notebook_label.autowrap_mode = TextServer.AUTOWRAP_ARBITRARY
+	notebook_label.add_theme_font_size_override("font_size", 18)
+	notebook_label.add_theme_color_override("font_color", Palette.INK_FAINT)
+	(item_box["list"] as VBoxContainer).add_child(notebook_label)
+
+	# 下部: 注意書き・設定・出発
+	var bottom := HBoxContainer.new()
+	bottom.add_theme_constant_override("separation", 12)
+	root.add_child(bottom)
+	warning_label = _desk_label("", 18)
+	warning_label.autowrap_mode = TextServer.AUTOWRAP_ARBITRARY
+	warning_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	warning_label.add_theme_color_override("font_color", Color("ffb3a6"))
+	bottom.add_child(warning_label)
+	reset_button = Button.new()
+	reset_button.custom_minimum_size = Vector2(260, 48)
+	reset_button.pressed.connect(request_reset)
+	bottom.add_child(reset_button)
+	mute_button = Button.new()
+	mute_button.text = Sfx.mute_button_text()
+	mute_button.custom_minimum_size = Vector2(96, 48)
+	mute_button.pressed.connect(func() -> void:
+		Sfx.set_muted(not Sfx.muted)
+		mute_button.text = Sfx.mute_button_text()
+		Sfx.play(&"click"))
+	bottom.add_child(mute_button)
+	depart_button = Button.new()
+	depart_button.text = "探索に出発"
+	depart_button.custom_minimum_size = Vector2(220, 52)
+	depart_button.add_theme_font_size_override("font_size", 26)
+	depart_button.pressed.connect(depart)
+	bottom.add_child(depart_button)
+
+
+func _desk_label(text: String, size: int) -> Label:
+	var label := Label.new()
+	label.text = text
+	label.add_theme_font_size_override("font_size", size)
+	label.add_theme_color_override("font_color", Palette.DESK_TEXT)
+	return label
+
+
+## 見出しつきの紙の棚。{"panel": 外枠, "list": 中身を並べる VBox}
+func _shelf(heading: String, stretch: float) -> Dictionary:
+	var panel := PanelContainer.new()
+	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	panel.size_flags_stretch_ratio = stretch
+	panel.add_theme_stylebox_override("panel", Palette.box(Palette.PAPER_DIM, Palette.INK_FAINT, 2, 6, 12.0))
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 8)
+	panel.add_child(vbox)
+	var head := Label.new()
+	head.text = heading
+	head.add_theme_font_size_override("font_size", 24)
+	vbox.add_child(head)
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	vbox.add_child(scroll)
+	var list := VBoxContainer.new()
+	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	list.add_theme_constant_override("separation", 8)
+	scroll.add_child(list)
+	return {"panel": panel, "list": list}
+
+
+func _build_adventurer_card(adventurer: Adventurer) -> PanelContainer:
+	var card := PanelContainer.new()
+	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 4)
+	card.add_child(vbox)
+	var head := HBoxContainer.new()
+	vbox.add_child(head)
+	var name_label := Label.new()
+	name_label.text = adventurer.display_name
+	name_label.add_theme_font_size_override("font_size", 28)
+	head.add_child(name_label)
+	var spacer := Control.new()
+	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	head.add_child(spacer)
+	var button := Button.new()
+	button.custom_minimum_size = Vector2(130, 36)
+	button.pressed.connect(choose.bind(adventurer.id))
+	head.add_child(button)
+	select_buttons[adventurer.id] = button
+	vbox.add_child(_small(adventurer.tagline, Palette.INK))
+	vbox.add_child(_small("報告のクセ: " + adventurer.report_style, Palette.INK_FAINT))
+	var stats: Array[String] = []
+	for stat in STAT_ORDER:
+		var value := adventurer.stat_for(stat)
+		stats.append("%s %s%s" % [Rules.STAT_LABELS[stat], "■".repeat(value), "□".repeat(maxi(0, 5 - value))])
+	vbox.add_child(_small("　".join(stats), Palette.INK))
+	return card
+
+
+func _small(text: String, color: Color) -> Label:
+	var label := Label.new()
+	label.text = text
+	label.autowrap_mode = TextServer.AUTOWRAP_ARBITRARY
+	label.add_theme_font_size_override("font_size", 17)
+	label.add_theme_color_override("font_color", color)
+	return label
+
+
+func _build_shop_row(item: ShopItem) -> PanelContainer:
+	var panel := PanelContainer.new()
+	panel.add_theme_stylebox_override("panel", Palette.box(Palette.PAPER, Palette.PAPER_DIM, 2, 6, 8.0))
+	var hbox := HBoxContainer.new()
+	hbox.add_theme_constant_override("separation", 10)
+	panel.add_child(hbox)
+	var text_box := VBoxContainer.new()
+	text_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hbox.add_child(text_box)
+	var name_label := Label.new()
+	name_label.text = item.title
+	name_label.add_theme_font_size_override("font_size", 21)
+	text_box.add_child(name_label)
+	text_box.add_child(_small(item.description, Palette.INK_FAINT))
+	var button := Button.new()
+	button.custom_minimum_size = Vector2(112, 44)
+	button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	button.pressed.connect(buy.bind(item.id))
+	hbox.add_child(button)
+	shop_rows[item.id] = {"panel": panel, "button": button, "item": item}
+	return panel
+
+
+# ---------------------------------------------------------------- 表示の更新
+
+func _refresh() -> void:
+	day_label.text = "%d日目" % GameSession.day
+	funds_label.text = "資金 %d 銀貨" % GameSession.funds
+	living_label.text = "（生活費 1日 %d 銀貨）" % Rules.LIVING_COST
+
+	for id in cards:
+		var selected: bool = id == GameSession.adventurer_id
+		(cards[id] as PanelContainer).add_theme_stylebox_override("panel",
+			Palette.box(Color("fff6d6") if selected else Palette.PAPER, GOLD if selected else Palette.PAPER_DIM, 4 if selected else 2, 8, 10.0))
+		var button := select_buttons[id] as Button
+		button.text = "選んでいる" if selected else "この人にする"
+		button.disabled = selected
+
+	for id in shop_rows:
+		var row: Dictionary = shop_rows[id]
+		var item: ShopItem = row["item"]
+		var button: Button = row["button"]
+		if GameSession.is_owned(item):
+			button.text = "購入済"
+			button.disabled = true
+		else:
+			button.text = "%d 銀貨" % item.price
+			button.disabled = GameSession.funds < item.price
+
+	var spots := SampleData.growth_spots()
+	var learned: Array[String] = []
+	for id in spots:
+		if GameSession.filled_blanks.has(id):
+			learned.append(spots[id])
+	notebook_label.text = "ノートの育ち %d / %d" % [learned.size(), spots.size()]
+	if not learned.is_empty():
+		notebook_label.text += "　書けたこと: " + "、".join(learned)
+
+	warning_label.text = ""
+	if GameSession.funds < Rules.LIVING_COST:
+		warning_label.text = "資金が生活費（%d）より少ない。探索の報酬で足りないと、暮らしていけなくなる…" % Rules.LIVING_COST
+	reset_button.text = "本当に消す？ もう一度押すとリセット" if _reset_armed else "最初からやり直す"
+
+
+# ---------------------------------------------------------------- 操作
+
+func choose(id: StringName) -> void:
+	GameSession.adventurer_id = id
+	Sfx.play(&"click")
+	_refresh()
+
+
+## 買う（情報・道具）。買えたら true
+func buy(item_id: StringName) -> bool:
+	if not shop_rows.has(item_id):
+		return false
+	var item: ShopItem = shop_rows[item_id]["item"]
+	var ok := GameSession.buy(item)
+	Sfx.play(&"coin" if ok else &"mismatch")
+	_refresh()
+	return ok
+
+
+## 探索に出発。テストでは go=false にしてシーン遷移を避ける。
+func depart(go: bool = true) -> void:
+	Sfx.play(&"select")
+	if go:
+		get_tree().change_scene_to_file(MATCHING_SCENE)
+
+
+## 全部を最初に戻す（ノート・資金・日数・道具）。誤って消さないよう、2回押して確定する。
+func request_reset() -> void:
+	Sfx.play(&"click")
+	if not _reset_armed:
+		_reset_armed = true
+	else:
+		_reset_armed = false
+		GameSession.reset_all()
+	_refresh()

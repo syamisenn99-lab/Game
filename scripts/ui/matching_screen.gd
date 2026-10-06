@@ -5,7 +5,7 @@ extends Control
 
 enum Phase { REPORTING, ROLLING, RESULT, SUMMARY }
 
-const START_SCENE := "res://scenes/start_screen.tscn"
+const PREP_SCENE := "res://scenes/prep_screen.tscn"
 const PAGE_TITLES := {&"plants": "植物", &"monsters": "魔物", &"traps": "罠", &"relics": "遺物"}
 
 var state: MatchingState
@@ -41,6 +41,8 @@ var _cmd_hint_active := false
 var _tab_base_titles: Array[String] = []
 var _last_whole_sec := 99
 var _mute_button: Button
+## 探索終了時の精算の結果（GameSession.settle の戻り値）
+var settlement: Dictionary = {}
 
 
 func _ready() -> void:
@@ -51,6 +53,11 @@ func _ready() -> void:
 	GameSession.load_notebook()
 	var adventurer := SampleData.adventurer(GameSession.adventurer_id)
 	state = MatchingState.new(adventurer, SampleData.events(adventurer.id), entries, GameSession.filled_blanks)
+	# 買った道具の効果
+	if GameSession.has_item(&"hourglass"):
+		state.time_scale = Rules.HOURGLASS_TIME_SCALE
+	if GameSession.has_item(&"sticky"):
+		state.penalty_scale = Rules.STICKY_PENALTY_SCALE
 	_name_label.text = "通信中: %s" % state.adventurer.display_name
 	_build_notebook()
 	_start_next_event()
@@ -246,7 +253,7 @@ func _start_next_event() -> void:
 	_set_stat_buttons_enabled(true)
 	_event_label.text = "イベント %d / %d" % [state.event_index + 1, state.events.size()]
 	_reward_label.text = "持ち帰り報酬: %d" % int(state.reward)
-	_timer_bar.max_value = state.current.time_limit
+	_timer_bar.max_value = state.event_time_limit
 	_update_timer_ui()
 	_refresh_suspects()
 	if state.auto_matched:
@@ -320,7 +327,7 @@ func _apply_reveal() -> void:
 func _update_timer_ui() -> void:
 	_timer_bar.value = state.time_left
 	_time_label.text = "%.1f" % state.time_left
-	var low := state.time_left < state.current.time_limit * 0.3
+	var low := state.time_left < state.event_time_limit * 0.3
 	_timer_bar.modulate = Color(1.0, 0.55, 0.5) if low else Color.WHITE
 
 
@@ -477,7 +484,7 @@ func _on_keyword_dropped(keyword_id: StringName, target_id: StringName) -> void:
 			_refresh_suspects()
 			GameSession.save_notebook()
 		MatchingState.DropResult.MISMATCH:
-			_line_label.text = "うーん、ここじゃない気がする…（時間が %.1f 秒減った）" % Rules.MISMATCH_PENALTY_SEC
+			_line_label.text = "うーん、ここじゃない気がする…（時間が %.1f 秒減った）" % (Rules.MISMATCH_PENALTY_SEC * state.penalty_scale)
 			var at := get_global_mouse_position()
 			if view != null:
 				view.flash(Color(1.0, 0.6, 0.6))
@@ -486,7 +493,7 @@ func _on_keyword_dropped(keyword_id: StringName, target_id: StringName) -> void:
 			Effects.burst(_overlay, at, Palette.NG, 12, false)
 			Effects.float_text(_overlay, "ちがう…", at + Vector2(0, -24), Palette.NG, 26)
 			var bar_end := _timer_bar.get_global_rect().get_center()
-			Effects.float_text(_overlay, "-%.1f秒" % Rules.MISMATCH_PENALTY_SEC, bar_end + Vector2(0, 36), Palette.NG, 26)
+			Effects.float_text(_overlay, "-%.1f秒" % (Rules.MISMATCH_PENALTY_SEC * state.penalty_scale), bar_end + Vector2(0, 36), Palette.NG, 26)
 			_update_timer_ui()
 
 
@@ -606,17 +613,34 @@ func _show_summary() -> void:
 	total.text = "持ち帰り報酬: %d / %d" % [int(state.reward), int(Rules.INITIAL_REWARD)]
 	total.add_theme_font_size_override("font_size", 26)
 	vbox.add_child(total)
-	var again := Button.new()
-	again.text = "もう一度"
-	again.custom_minimum_size = Vector2(0, 44)
-	again.pressed.connect(func() -> void:
+
+	# 精算: 報酬を受け取り、生活費を払う
+	settlement = GameSession.settle(int(state.reward))
+	vbox.add_child(HSeparator.new())
+	vbox.add_child(_settle_line("報酬を受け取った", "+%d 銀貨" % settlement["reward"], Palette.OK))
+	vbox.add_child(_settle_line("生活費（%d日目）" % settlement["day"], "-%d 銀貨" % settlement["living"], Palette.NG))
+	var after := _settle_line("残りの資金", "%d 銀貨" % settlement["funds_after"], Palette.INK)
+	after.add_theme_font_size_override("font_size", 26)
+	vbox.add_child(after)
+	if settlement["bankrupt"]:
+		var over := Label.new()
+		over.text = "資金が尽きて、生活できなくなってしまった…"
+		over.add_theme_color_override("font_color", Palette.NG)
+		vbox.add_child(over)
+
+	var next := Button.new()
+	next.text = "最初からやり直す" if settlement["bankrupt"] else "準備に戻る"
+	next.custom_minimum_size = Vector2(0, 48)
+	next.pressed.connect(func() -> void:
 		Sfx.play(&"click")
-		get_tree().reload_current_scene())
-	vbox.add_child(again)
-	var choose := Button.new()
-	choose.text = "ガイドする人を選びなおす"
-	choose.custom_minimum_size = Vector2(0, 44)
-	choose.pressed.connect(func() -> void:
-		Sfx.play(&"click")
-		get_tree().change_scene_to_file(START_SCENE))
-	vbox.add_child(choose)
+		if settlement["bankrupt"]:
+			GameSession.reset_all()
+		get_tree().change_scene_to_file(PREP_SCENE))
+	vbox.add_child(next)
+
+
+func _settle_line(left: String, right: String, color: Color) -> Label:
+	var label := Label.new()
+	label.text = "%s　　%s" % [left, right]
+	label.add_theme_color_override("font_color", color)
+	return label

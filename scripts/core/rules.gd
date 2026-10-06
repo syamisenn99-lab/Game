@@ -19,6 +19,15 @@ const FAIL_REWARD_LOSS := 0.10
 const CRIT_FAIL_REWARD_LOSS := 0.20
 const INITIAL_REWARD := 300.0
 
+## 経済（すべて仮の初期値。遊んで調整する）
+const START_FUNDS := 200
+## 1日（探索1回）ごとにかかる生活費
+const LIVING_COST := 120
+## 上質な砂時計: 制限時間にかかる倍率
+const HOURGLASS_TIME_SCALE := 1.2
+## 上質な付箋: 不一致ドロップで失う時間にかかる倍率
+const STICKY_PENALTY_SCALE := 0.5
+
 
 ## 指示（＝判定に使う能力値）。MVP では戦闘・探索・回避の3つに絞る
 const STATS: Array[StringName] = [&"battle", &"explore", &"evade"]

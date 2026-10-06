@@ -68,8 +68,52 @@ static func growth_spots() -> Dictionary:
 	var spots: Dictionary = {}
 	for entry in entries():
 		for id in entry.blank_fills:
-			spots[StringName(id)] = "「%s」（%s）" % [entry.blank_fills[id], entry.title]
+			# 項目名の補足（「（第2層）」など）は省いて、カッコが重ならないようにする
+			spots[StringName(id)] = "「%s」（%s）" % [entry.blank_fills[id], entry.title.split("（")[0]]
 	return spots
+
+
+## 準備フェーズで売っているダンジョンの情報。買うと、ノートの育つ箇所が1つ埋まる
+static func info_offers() -> Array[ShopItem]:
+	var list: Array[ShopItem] = []
+	list.append(_offer(&"beast_aversion", "爪の獣が嫌うもの", "第2層の「鋭い爪の獣」の弱点を、情報屋が教えてくれる。", 90))
+	list.append(_offer(&"moss_safe", "光る苔の本当の性質", "「触っても無害」という又聞きは、本当だろうか。確かめた人から話を聞く。", 90))
+	list.append(_offer(&"pit_sign", "落とし穴の見つけ方", "仕掛けの目印を、通りがかりの冒険者が知っている。", 70))
+	list.append(_offer(&"pit_depth", "落とし穴の深さ", "「浅い」という話は本当か。落ちたことのある人に聞く。", 90))
+	list.append(_offer(&"bat_weak", "コウモリの弱点", "群れで天井に張りつく蝙蝠の、追い払い方。", 70))
+	list.append(_offer(&"tablet_light", "石板の読み方", "古い石板の文字を浮かばせる方法を、遺物商が知っている。", 110))
+	return list
+
+
+## 準備フェーズで買える道具（資金の使い道）
+static func items() -> Array[ShopItem]:
+	var list: Array[ShopItem] = []
+	var hourglass := ShopItem.new()
+	hourglass.id = &"hourglass"
+	hourglass.kind = &"item"
+	hourglass.title = "上質な砂時計"
+	hourglass.description = "指示を出すまでの制限時間が、2割のびる。"
+	hourglass.price = 150
+	list.append(hourglass)
+	var sticky := ShopItem.new()
+	sticky.id = &"sticky"
+	sticky.kind = &"item"
+	sticky.title = "上質な付箋"
+	sticky.description = "貼って剥がせる付箋。間違えて失う時間が、半分になる。"
+	sticky.price = 120
+	list.append(sticky)
+	return list
+
+
+static func _offer(target: StringName, title: String, description: String, price: int) -> ShopItem:
+	var item := ShopItem.new()
+	item.id = StringName("info_%s" % target)
+	item.kind = &"info"
+	item.title = title
+	item.description = description
+	item.price = price
+	item.target = target
+	return item
 
 
 static func events(id: StringName = CHILDHOOD) -> Array[EventDef]:

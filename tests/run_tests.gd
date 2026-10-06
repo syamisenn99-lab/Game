@@ -22,7 +22,7 @@ func _reset_session() -> void:
 	# テストではファイルを読み書きせず、ノートは毎回まっさらにする
 	GameSession.persist = false
 	GameSession._loaded = true
-	GameSession.reset_notebook()
+	GameSession.reset_all()
 	GameSession.adventurer_id = SampleData.CHILDHOOD
 
 
@@ -38,6 +38,7 @@ func _run() -> void:
 	await _test_slot_hover()
 	_test_mercenary_data()
 	await _test_start_screen()
+	await _test_economy()
 	await _test_mercenary_flow()
 	_test_carry_over()
 	await _test_carry_over_ui()
@@ -262,6 +263,8 @@ func _test_ui_flow() -> void:
 	screen._start_next_event()
 	await _frames(2)
 	_check(screen._phase == MatchingScreen.Phase.SUMMARY, "ui: summary after the last event")
+	_check(screen.settlement.get("day") == 1 and GameSession.day == 2, "ui: the expedition is settled and the day advances")
+	_check(screen.settlement["funds_after"] == GameSession.funds and GameSession.funds == Rules.START_FUNDS + screen.settlement["reward"] - Rules.LIVING_COST, "ui: the funds reflect the reward and the living cost")
 	screen.queue_free()
 	await _frames(2)
 
@@ -367,16 +370,92 @@ func _test_mercenary_data() -> void:
 ## 選択画面: 2人が並び、選ぶとセッションに保存される
 func _test_start_screen() -> void:
 	_reset_session()
-	var screen: StartScreen = load("res://scenes/start_screen.tscn").instantiate()
+	var screen: PrepScreen = load("res://scenes/prep_screen.tscn").instantiate()
 	root.add_child(screen)
 	await _frames(3)
-	_check(screen.cards.size() == 2 and screen.cards.has(SampleData.MERCENARY) and screen.cards.has(SampleData.CHILDHOOD), "start: both adventurers are offered")
-	screen.select(SampleData.MERCENARY, false)
-	_check(GameSession.adventurer_id == SampleData.MERCENARY, "start: the choice is remembered")
-	screen.select(SampleData.CHILDHOOD, false)
-	_check(GameSession.adventurer_id == SampleData.CHILDHOOD, "start: the choice can be changed")
+	_check(screen.cards.size() == 2 and screen.cards.has(SampleData.MERCENARY) and screen.cards.has(SampleData.CHILDHOOD), "prep: both adventurers are offered")
+	screen.choose(SampleData.MERCENARY)
+	_check(GameSession.adventurer_id == SampleData.MERCENARY, "prep: the choice is remembered")
+	_check((screen.select_buttons[SampleData.MERCENARY] as Button).disabled and not (screen.select_buttons[SampleData.CHILDHOOD] as Button).disabled, "prep: the chosen adventurer is marked")
+	screen.choose(SampleData.CHILDHOOD)
+	_check(GameSession.adventurer_id == SampleData.CHILDHOOD, "prep: the choice can be changed")
+	_check(screen.day_label.text == "1日目" and screen.funds_label.text.contains("200"), "prep: day and funds are shown (%s / %s)" % [screen.day_label.text, screen.funds_label.text])
+	_check(screen.shop_rows.size() == 8, "prep: six pieces of information and two items are for sale (%d)" % screen.shop_rows.size())
 	screen.queue_free()
 	await _frames(2)
+
+
+## 準備フェーズの買い物と精算
+func _test_economy() -> void:
+	_reset_session()
+	var screen: PrepScreen = load("res://scenes/prep_screen.tscn").instantiate()
+	root.add_child(screen)
+	await _frames(3)
+	# 情報を買う: 資金が減り、ノートの箇所が埋まる
+	_check(screen.buy(&"info_beast_aversion"), "econ: buying information succeeds")
+	_check(GameSession.funds == Rules.START_FUNDS - 90 and GameSession.filled_blanks.has(&"beast_aversion"), "econ: the funds drop and the note spot is filled (%d)" % GameSession.funds)
+	_check(not screen.buy(&"info_beast_aversion") and GameSession.funds == Rules.START_FUNDS - 90, "econ: the same information cannot be bought twice")
+	_check((screen.shop_rows[&"info_beast_aversion"]["button"] as Button).text == "購入済", "econ: the row shows it is bought")
+	# 足りないと買えない
+	_check(not screen.buy(&"hourglass") and GameSession.funds == Rules.START_FUNDS - 90, "econ: an item the funds cannot cover is refused")
+	_check((screen.shop_rows[&"hourglass"]["button"] as Button).disabled, "econ: the button is disabled when the funds are short")
+	GameSession.funds = 500
+	screen._refresh()
+	_check(screen.buy(&"hourglass") and screen.buy(&"sticky") and GameSession.funds == 500 - 150 - 120, "econ: items can be bought with enough funds")
+	_check(GameSession.has_item(&"hourglass") and GameSession.has_item(&"sticky"), "econ: the items are owned")
+	screen.queue_free()
+	await _frames(2)
+
+	# 道具の効果は探索に反映される
+	var matching: MatchingScreen = load("res://scenes/matching_screen.tscn").instantiate()
+	root.add_child(matching)
+	await _frames(3)
+	_check(is_equal_approx(matching.state.event_time_limit, 25.0 * Rules.HOURGLASS_TIME_SCALE), "econ: the hourglass stretches the time limit (%.1f)" % matching.state.event_time_limit)
+	var before := matching.state.time_left
+	matching.state.drop(&"mushroom", &"glow_moss")
+	_check(is_equal_approx(before - matching.state.time_left, Rules.MISMATCH_PENALTY_SEC * Rules.STICKY_PENALTY_SCALE), "econ: the sticky notes halve the penalty")
+	matching.queue_free()
+	await _frames(2)
+
+	# 精算: 報酬 - 生活費、日が進む
+	_reset_session()
+	var result := GameSession.settle(250)
+	_check(result["funds_after"] == Rules.START_FUNDS + 250 - Rules.LIVING_COST and GameSession.day == 2 and not result["bankrupt"], "econ: settlement pays the reward and the living cost")
+	# 資金が尽きる
+	GameSession.funds = 10
+	var broke := GameSession.settle(20)
+	_check(broke["bankrupt"] and GameSession.funds == 0, "econ: running out of money ends the game")
+	GameSession.reset_all()
+	_check(GameSession.funds == Rules.START_FUNDS and GameSession.day == 1 and GameSession.filled_blanks.is_empty() and GameSession.owned_items.is_empty(), "econ: reset_all restores everything")
+
+	# 保存と読み込み（資金・日数・道具）
+	var temp_path := "user://test_save.json"
+	GameSession.persist = true
+	GameSession.save_path = temp_path
+	GameSession.funds = 321
+	GameSession.day = 5
+	GameSession.owned_items = {&"hourglass": true}
+	GameSession.filled_blanks = {&"pit_sign": true}
+	GameSession.save_notebook()
+	GameSession.funds = 0
+	GameSession.day = 1
+	GameSession.owned_items = {}
+	GameSession.filled_blanks = {}
+	GameSession._loaded = false
+	GameSession.load_notebook()
+	_check(GameSession.funds == 321 and GameSession.day == 5 and GameSession.has_item(&"hourglass") and GameSession.filled_blanks.has(&"pit_sign"), "econ: funds, day, items and notes are saved and loaded")
+	# 古い保存ファイル（ノートだけ）も読める
+	var file := FileAccess.open(temp_path, FileAccess.WRITE)
+	file.store_string(JSON.stringify({"filled": ["bat_weak"]}))
+	file.close()
+	GameSession.funds = 0
+	GameSession.filled_blanks = {}
+	GameSession._loaded = false
+	GameSession.load_notebook()
+	_check(GameSession.filled_blanks.has(&"bat_weak") and GameSession.funds == Rules.START_FUNDS and GameSession.day == 1, "econ: an old save with only notes still loads")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(temp_path))
+	GameSession.save_path = "user://notebook.json"
+	_reset_session()
 
 
 ## 傭兵で最後まで遊ぶ（実際の画面を通す）
@@ -487,17 +566,19 @@ func _test_carry_over_ui() -> void:
 	await _frames(2)
 
 	_reset_session()
-	var start: StartScreen = load("res://scenes/start_screen.tscn").instantiate()
+	var start: PrepScreen = load("res://scenes/prep_screen.tscn").instantiate()
 	root.add_child(start)
 	await _frames(3)
-	_check(start.notebook_label.text.contains("0 / 6"), "carry ui: the start screen shows no growth at first (%s)" % start.notebook_label.text)
+	_check(start.notebook_label.text.contains("0 / 6"), "carry ui: the prep screen shows no growth at first (%s)" % start.notebook_label.text)
 	GameSession.filled_blanks[&"beast_aversion"] = true
-	start._refresh_notebook_info()
-	_check(start.notebook_label.text.contains("1 / 6") and start.notebook_label.text.contains("火"), "carry ui: the start screen shows what has been written (%s)" % start.notebook_label.text)
+	GameSession.funds = 50
+	start._refresh()
+	_check(start.notebook_label.text.contains("1 / 6") and start.notebook_label.text.contains("火"), "carry ui: the prep screen shows what has been written (%s)" % start.notebook_label.text)
+	_check(start.warning_label.text.contains("生活費"), "carry ui: low funds trigger a warning")
 	start.request_reset()
-	_check(GameSession.filled_blanks.has(&"beast_aversion"), "carry ui: the first press only asks for confirmation")
+	_check(GameSession.filled_blanks.has(&"beast_aversion") and GameSession.funds == 50, "carry ui: the first press only asks for confirmation")
 	start.request_reset()
-	_check(GameSession.filled_blanks.is_empty() and start.notebook_label.text.contains("0 / 6"), "carry ui: the second press resets the notebook")
+	_check(GameSession.filled_blanks.is_empty() and GameSession.funds == Rules.START_FUNDS and start.notebook_label.text.contains("0 / 6"), "carry ui: the second press resets everything")
 	start.queue_free()
 	await _frames(2)
 	_reset_session()

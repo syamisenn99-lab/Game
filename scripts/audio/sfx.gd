@@ -32,7 +32,7 @@ static func shutdown() -> void:
 
 static func names() -> Array[StringName]:
 	return [&"grab", &"hover", &"match", &"fix", &"stamp", &"mismatch", &"ting", &"known",
-		&"tick", &"success", &"fail", &"crit_fail", &"warn", &"type", &"click", &"select"]
+		&"tick", &"success", &"fail", &"crit_fail", &"warn", &"type", &"click", &"select", &"coin"]
 
 
 static func stream(sound: StringName) -> AudioStreamWAV:
@@ -180,7 +180,13 @@ static func _recipe(sound: StringName) -> Array:
 			return [{"dur": 0.015, "f0": 1500.0, "wave": "sine", "vol": 0.06, "curve": 1.0, "attack": 0.001}]
 		&"click":   # ボタン
 			return [{"dur": 0.05, "f0": 620.0, "wave": "tri", "vol": 0.22, "curve": 2.0, "attack": 0.001}]
-		&"select":  # 冒険者を選ぶ: 2音のチャイム
+		&"coin":    # 買い物: 硬貨の「チャリン」
+			return [
+				{"t": 0.00, "dur": 0.10, "f0": 1568.0, "wave": "sine", "vol": 0.24, "curve": 2.0, "attack": 0.001},
+				{"t": 0.06, "dur": 0.32, "f0": 2093.0, "wave": "sine", "vol": 0.26, "curve": 2.4, "attack": 0.001},
+				{"t": 0.06, "dur": 0.32, "f0": 4186.0, "wave": "sine", "vol": 0.05, "curve": 3.0, "attack": 0.001},
+			]
+		&"select":  # 出発・選択: 2音のチャイム
 			return [
 				{"t": 0.00, "dur": 0.20, "f0": 659.0, "wave": "sine", "vol": 0.30},
 				{"t": 0.10, "dur": 0.40, "f0": 988.0, "wave": "sine", "vol": 0.30, "curve": 2.2},

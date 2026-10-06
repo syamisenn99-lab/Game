@@ -25,6 +25,11 @@ var learned: Array[StringName] = []
 var blank_owner: Dictionary = {}
 ## 訂正箇所（ノートの記述が間違っているかもしれない場所）の id
 var fix_ids: Dictionary = {}
+## 道具の効果。時間の倍率と、不一致ペナルティの倍率
+var time_scale := 1.0
+var penalty_scale := 1.0
+## このイベントの制限時間（道具の効果を含む）
+var event_time_limit := 0.0
 var reward := Rules.INITIAL_REWARD
 var results: Array[Dictionary] = []
 
@@ -51,7 +56,8 @@ func begin_next_event() -> bool:
 		return false
 	event_index += 1
 	current = events[event_index]
-	time_left = current.time_limit
+	event_time_limit = current.time_limit * time_scale
+	time_left = event_time_limit
 	matched = false
 	auto_matched = false
 	auto_target = &""
@@ -100,7 +106,7 @@ func drop(keyword_id: StringName, target_id: StringName) -> DropResult:
 			filled_blanks[target_id] = true
 			learned.append(target_id)
 		return DropResult.MATCHED
-	time_left = maxf(0.0, time_left - Rules.MISMATCH_PENALTY_SEC)
+	time_left = maxf(0.0, time_left - Rules.MISMATCH_PENALTY_SEC * penalty_scale)
 	return DropResult.MISMATCH
 
 

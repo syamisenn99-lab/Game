@@ -26,6 +26,7 @@ func _run() -> void:
 	await _test_ui_flow()
 	await _test_real_drag()
 	await _test_effects()
+	await _test_slot_hover()
 	print("%d checks, %d failures" % [_checks, _failures])
 	quit(1 if _failures > 0 else 0)
 
@@ -186,6 +187,49 @@ func _test_effects() -> void:
 	_check(screen._overlay.get_child_count() == 0, "fx: effects are cleaned up (%d left)" % screen._overlay.get_child_count())
 	_check(is_zero_approx(wrong.rotation) and is_equal_approx(good.scale.x, 1.0), "fx: entries return to rest")
 	_check(is_equal_approx(good._stamp.scale.x, 1.0) and is_equal_approx(good._stamp.modulate.a, 1.0), "fx: stamp settles")
+	screen.queue_free()
+	await _frames(2)
+
+
+## 獣の穴: ドラッグ中、穴の上では穴だけが光り、項目の上（穴の外）では項目だけが光る
+func _test_slot_hover() -> void:
+	root.size = Vector2i(1280, 720)
+	var screen: MatchingScreen = load("res://scenes/matching_screen.tscn").instantiate()
+	root.add_child(screen)
+	await _frames(3)
+	screen.state.resolved = true
+	screen._start_next_event()
+	await _frames(2)
+	screen._reveal_all()
+	screen._tabs.current_tab = 1
+	await _frames(4)
+	var chip := screen._chips[0]
+	var entry: NoteEntryView = screen._entry_views[&"beast_claw"]
+	var slot: BlankSlot = entry.slots[&"beast_aversion"]
+	_check(slot.size.x >= 140.0 and slot.size.y >= 48.0, "slot: is large enough to hit (%s)" % slot.size)
+
+	var from := chip.get_global_rect().get_center()
+	_last_mouse = from
+	_push_mouse_motion(from, 0)
+	_push_mouse_button(from, true)
+	await _frames(2)
+	_push_mouse_motion(from + Vector2(30, 0), MOUSE_BUTTON_MASK_LEFT)
+	await _frames(3)
+	_check(slot.hint == BlankSlot.Hint.DRAGGING, "slot: shows a faint hint while dragging")
+	# 項目の上（穴ではない場所）
+	var on_entry := entry.get_global_rect().position + Vector2(40, 12)
+	_push_mouse_motion(on_entry, MOUSE_BUTTON_MASK_LEFT)
+	await _frames(3)
+	_check(entry.hint == NoteEntryView.Hint.HOVER and slot.hint == BlankSlot.Hint.DRAGGING, "hover: entry lights up, slot does not")
+	# 穴の上
+	_push_mouse_motion(slot.get_global_rect().get_center(), MOUSE_BUTTON_MASK_LEFT)
+	await _frames(3)
+	_check(slot.hint == BlankSlot.Hint.HOVER and entry.hint != NoteEntryView.Hint.HOVER, "hover: only the slot lights up over the slot")
+	_check(slot._label.text == "ここ！", "hover: slot says here")
+	_push_mouse_button(slot.get_global_rect().get_center(), false)
+	await _frames(4)
+	_check(screen.state.matched and slot.filled, "drop: the large slot accepts the torch")
+	_check(slot.hint == BlankSlot.Hint.NONE and entry.hint == NoteEntryView.Hint.NONE, "hover: highlights are cleared after the drop")
 	screen.queue_free()
 	await _frames(2)
 

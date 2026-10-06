@@ -5,15 +5,20 @@ extends PanelContainer
 signal keyword_dropped(keyword_id: StringName, target_id: StringName)
 signal target_clicked(target_id: StringName)
 
+enum Hint { NONE, DRAGGING, HOVER }
+
 var entry: NoteEntry
 var slots: Dictionary = {}
+var hint := Hint.NONE
 var _stamp: Label
 
 
 func setup(p_entry: NoteEntry, filled_blanks: Dictionary) -> void:
 	entry = p_entry
 	mouse_filter = Control.MOUSE_FILTER_STOP
-	_apply_style(false)
+	mouse_entered.connect(_on_mouse_entered)
+	mouse_exited.connect(_on_mouse_exited)
+	_apply_style()
 
 	var vbox := VBoxContainer.new()
 	vbox.add_theme_constant_override("separation", 4)
@@ -94,16 +99,44 @@ func wobble() -> void:
 	Effects.wobble(self)
 
 
-func _apply_style(hint: bool) -> void:
-	var border := Palette.DROP_HINT if hint else Palette.PAPER_DIM
-	add_theme_stylebox_override("panel", Palette.box(Palette.PAPER, border, 2, 6, 10.0))
+## ドラッグ中、マウスが項目の上にあるときだけ項目をハイライトする。
+## 穴の上に乗ると、穴（子のコントロール）側に入るので mouse_exited が来て、項目の光は消える。
+func _on_mouse_entered() -> void:
+	if get_viewport().gui_is_dragging():
+		_set_hint(Hint.HOVER)
+
+
+func _on_mouse_exited() -> void:
+	if get_viewport().gui_is_dragging():
+		_set_hint(Hint.DRAGGING)
+
+
+func _set_hint(value: Hint) -> void:
+	if value == hint:
+		return
+	hint = value
+	_apply_style()
+
+
+func _apply_style() -> void:
+	var sb: StyleBoxFlat
+	match hint:
+		Hint.HOVER:
+			sb = Palette.box(Palette.PAPER, Palette.DROP_HINT, 3, 6, 10.0)
+			sb.shadow_color = Color(0.18, 0.43, 0.71, 0.4)
+			sb.shadow_size = 8
+		Hint.DRAGGING:
+			sb = Palette.box(Palette.PAPER, Color(0.18, 0.43, 0.71, 0.45), 2, 6, 10.0)
+		_:
+			sb = Palette.box(Palette.PAPER, Palette.PAPER_DIM, 2, 6, 10.0)
+	add_theme_stylebox_override("panel", sb)
 
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_DRAG_BEGIN:
-		_apply_style(true)
+		_set_hint(Hint.DRAGGING)
 	elif what == NOTIFICATION_DRAG_END:
-		_apply_style(false)
+		_set_hint(Hint.NONE)
 
 
 func _can_drop_data(_at_position: Vector2, data: Variant) -> bool:

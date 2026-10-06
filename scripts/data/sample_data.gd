@@ -6,6 +6,8 @@ const CHILDHOOD := &"childhood"
 const MERCENARY := &"mercenary"
 const DOCTOR := &"doctor"
 const NOBLE := &"noble"
+## 最初の探索（チュートリアル）のイベント列を指す名前。冒険者ではなく、events() に渡す
+const TUTORIAL := &"tutorial"
 
 
 ## 選択画面に並べる冒険者
@@ -142,6 +144,8 @@ static func _offer(target: StringName, title: String, description: String, price
 
 
 static func events(id: StringName = CHILDHOOD) -> Array[EventDef]:
+	if id == TUTORIAL:
+		return _tutorial_events()
 	if id == MERCENARY:
 		return _mercenary_events()
 	if id == DOCTOR:
@@ -233,6 +237,61 @@ static func _mercenary_events() -> Array[EventDef]:
 		"浮かんだ文字を写させた。隠し部屋の場所だ。……金になる。",
 		"読み取れなかった。時間の無駄だったな。")
 	list.append(tablet)
+	return list
+
+
+## チュートリアル（プロローグのあとの、幼なじみとの最初の冒険）。本番とは別の、3つの短い場面。
+## 1つずつ、基本の操作を教える: ①照合して指示 ②虫食いを埋める ③ノートを訂正する。
+static func _tutorial_events() -> Array[EventDef]:
+	var list: Array[EventDef] = []
+	var t1 := _timed(_event(&"t1_mushroom",
+		"あっ、見て！洞窟の隅に[kw:mushroom]青い斑点のキノコ[/kw]が生えてる。おいしそう…食べても平気かな？",
+		&"evade", 12, {&"mushroom": &"mushroom_poison"},
+		"待って、それは毒だ！",
+		"よく見たら怪しい色だね。触らずに避けて通り過ぎたよ。",
+		"つい手を伸ばしちゃった…手がかぶれたかも。"), 60.0)
+	t1.coach = {
+		"report": "幼なじみの声が、文字で届いているよ。映像も音もない、声だけが頼りだね。（ふだんは制限時間があるけど、今は止まっているよ）",
+		"drag": "黄色くハイライトされた言葉は、手がかりだよ。光っている「毒キノコの見分け方」の項目まで、ドラッグして運ぼう。",
+		"wrong_drop": "そこじゃないみたい。金色に光っている項目に運んでみよう。",
+		"matched": "照合できた！ ノートには「近づかず、触れないように避けて通ること」と書いてあるね。",
+		"command": "下の指示から、ノートの内容に合うものを選ぼう。避けて通るなら、「回避」だよ。",
+		"wrong_command": "ノートには「避けて通ること」とあるよ。避ける指示は「回避」だね。",
+		"result": "成功！ ノートと照合して、正しい指示を出すと、成功しやすくなるよ。",
+	}
+	list.append(t1)
+	var t2 := _timed(_event(&"t2_beast",
+		"爪の長い獣がこっちに来る！とっさに[kw:torch]松明[/kw]を振ったら、怯んで後ずさった！今のうちにどうする？",
+		&"battle", 13, {&"torch": &"beast_aversion"},
+		"松明で怯んだ…ってことは、火が苦手なんだ！ノートに書いておくね。",
+		"火を突きつけながら押し返したら、獣は唸って去っていったよ。",
+		"押し切れなくて、飛びかかられて荷物の一部を落としちゃった…"), 60.0)
+	t2.coach = {
+		"report": "今度は、獣だ！ノートの「鋭い爪の獣」を見てみよう。「？？？を極端に嫌う」と、空欄になっているよ。",
+		"drag": "幼なじみは、松明で獣が怯むのを見たんだね。「松明」を、ノートの空欄「？？？」にドラッグしよう。見たことを書き込んで、ノートを育てられるよ。",
+		"wrong_drop": "空欄は、金色に光っているところだよ。言葉を、そこに運んでみよう。",
+		"matched": "空欄が「火」で埋まったね！ ノートが育ったよ。探索を重ねるほど、ノートは頼もしくなる。",
+		"command": "ノートには「正面から押し返して追い払える」とあるね。押し返すなら、「戦闘」だよ。",
+		"wrong_command": "ノートには「押し返して追い払える」とあるよ。立ち向かう指示は「戦闘」だね。",
+		"result": "うまくいったね！ 埋めたノートは、次の探索でも役に立つよ。",
+	}
+	list.append(t2)
+	var t3 := _timed(_event(&"t3_moss",
+		"光る苔がびっしり生えてる！…試しに[kw:numb]触ってみたら、手がしびれて[/kw]きた…！ ノートには触っても無害って書いてあったよね？ どうしよう？",
+		&"evade", 12, {&"numb": &"moss_safe"},
+		"触るとしびれるなんて…ノートが間違ってた。「触るとしびれる」に直しておくね。",
+		"息を止めて苔から離れたら、しびれもすぐに治まったよ。",
+		"しびれたまま慌てて動いて、荷物を少し落としちゃった…"), 60.0)
+	t3.coach = {
+		"report": "ノートの「光る苔」を見てみよう。「触っても無害」と書いてあるけど…幼なじみの報告と、食い違っていないかな？",
+		"drag": "ノートが間違っていることもあるよ。オレンジに光っている記述に、報告の言葉を運ぶと、ノートを訂正できる。",
+		"wrong_drop": "オレンジに光っているところに、運んでみよう。",
+		"matched": "訂正できた！ ノートは、冒険者の報告で、直して育てていくものなんだ。",
+		"command": "ノートには「離れて通ること」とあるね。離れるなら、「回避」だよ。",
+		"wrong_command": "ノートには「離れて通ること」とあるよ。離れる指示は「回避」だね。",
+		"result": "これで基本は、ばっちり！ ここからは、本番だよ。",
+	}
+	list.append(t3)
 	return list
 
 
@@ -352,6 +411,7 @@ const SKETCHES := {
 	&"e5_moss": &"moss", &"e6_pit_sign": &"pit", &"e7_pit_depth": &"pit_deep",
 	&"m1_bats": &"bat", &"m2_beast": &"beast", &"m3_pattern": &"pattern", &"m4_statue": &"statue",
 	&"m5_bats_again": &"bat", &"m6_tablet": &"tablet",
+	&"t1_mushroom": &"mushroom", &"t2_beast": &"beast", &"t3_moss": &"moss",
 	&"d1_rash": &"mushroom", &"d2_herb": &"herb", &"d3_numb": &"moss", &"d4_bats_high": &"bat",
 	&"n1_pattern": &"pattern", &"n2_tablet": &"tablet", &"n3_statue": &"statue", &"n4_keyhole": &"keyhole",
 }

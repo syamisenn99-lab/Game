@@ -20,6 +20,8 @@ var hint := Hint.NONE
 var old_text := ""
 ## 報告とノートが食い違っていて、訂正できそうなとき
 var suspect := false
+## チュートリアルで「ここに運んで」と示すとき（金色に脈打つ）
+var guide := false
 var _label: Label
 var _pulse: Tween
 var _suspect_tween: Tween
@@ -50,6 +52,14 @@ func set_filled(value: bool) -> void:
 	filled = value
 	if filled:
 		suspect = false
+		guide = false
+	_refresh()
+
+
+func set_guide(value: bool) -> void:
+	if filled:
+		value = false
+	guide = value
 	_refresh()
 
 
@@ -115,6 +125,11 @@ func _make_style() -> StyleBoxFlat:
 		sb = Palette.box(Color(0.82, 0.88, 0.97), Palette.DROP_HINT, 3, 8, 4.0)
 		sb.shadow_color = Color(0.18, 0.43, 0.71, 0.45)
 		sb.shadow_size = 8
+	elif guide:
+		# チュートリアルの案内: 金色の枠
+		sb = Palette.box(Color("fff3b0"), Color("e0a800"), 4, 8, 4.0)
+		sb.shadow_color = Color(1.0, 0.85, 0.2, 0.9)
+		sb.shadow_size = 8
 	elif suspect:
 		# 食い違いの候補: オレンジの枠
 		sb = Palette.box(Color("ffe9c2"), SUSPECT_COLOR, 3, 8, 4.0)
@@ -131,7 +146,7 @@ func _update_suspect_pulse(sb: StyleBoxFlat) -> void:
 	if _suspect_tween != null:
 		_suspect_tween.kill()
 		_suspect_tween = null
-	if suspect and not filled and hint == Hint.NONE:
+	if (suspect or guide) and not filled and hint == Hint.NONE:
 		_suspect_tween = create_tween().set_loops()
 		_suspect_tween.tween_property(sb, "shadow_size", 18, 0.5).set_trans(Tween.TRANS_SINE)
 		_suspect_tween.tween_property(sb, "shadow_size", 5, 0.5).set_trans(Tween.TRANS_SINE)

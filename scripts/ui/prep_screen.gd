@@ -358,10 +358,14 @@ func _maybe_play_story() -> bool:
 	if not GameSession.story_enabled:
 		return false
 	var scene := StoryDirector.next_for_prep()
-	if scene == null:
-		return false
-	StoryDirector.play.call_deferred(get_tree(), scene.id, PREP_SCENE)
-	return true
+	if scene != null:
+		StoryDirector.play.call_deferred(get_tree(), scene.id, PREP_SCENE)
+		return true
+	# プロローグのあと、チュートリアルの冒険が終わっていなければ、そこから再開する
+	if StoryDirector.pending_tutorial():
+		StoryDirector.start_tutorial.call_deferred(get_tree())
+		return true
+	return false
 
 
 ## 姉の手がかり帳を開く。見つけた手がかりを読み返せる

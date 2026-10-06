@@ -20,6 +20,8 @@ static var runs: Dictionary = {}
 ## 再生する場面と、終わったあとに進むシーン
 static var story_scene: StringName = &""
 static var story_next := "res://scenes/prep_screen.tscn"
+## チュートリアル（最初の冒険）の最中か。保存はしない（見終わったかどうかは、見た場面 &"tutorial" で判断する）
+static var tutorial_active := false
 ## false にすると、場面を出さない・シーンを切り替えない（テスト用）
 static var story_enabled := true
 static var navigate := true
@@ -88,6 +90,7 @@ static func reset_notebook() -> void:
 
 ## ノート・資金・日数・道具のすべてを最初に戻す
 static func reset_all() -> void:
+	tutorial_active = false
 	filled_blanks.clear()
 	owned_items.clear()
 	seen_scenes.clear()

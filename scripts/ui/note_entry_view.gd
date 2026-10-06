@@ -10,6 +10,9 @@ enum Hint { NONE, DRAGGING, HOVER }
 var entry: NoteEntry
 var slots: Dictionary = {}
 var hint := Hint.NONE
+## チュートリアルで「この項目に運んで」と示すとき（金色に脈打つ）
+var guide := false
+var _guide_tween: Tween
 var _stamp: Label
 
 
@@ -121,8 +124,25 @@ func _set_hint(value: Hint) -> void:
 	_apply_style()
 
 
+func set_guide(value: bool) -> void:
+	guide = value
+	_apply_style()
+
+
 func _apply_style() -> void:
 	var sb: StyleBoxFlat
+	if _guide_tween != null:
+		_guide_tween.kill()
+		_guide_tween = null
+	if guide and hint == Hint.NONE:
+		sb = Palette.box(Color("fff8dc"), Color("e0a800"), 4, 6, 10.0)
+		sb.shadow_color = Color(1.0, 0.85, 0.2, 0.9)
+		sb.shadow_size = 6
+		add_theme_stylebox_override("panel", sb)
+		_guide_tween = create_tween().set_loops()
+		_guide_tween.tween_property(sb, "shadow_size", 18, 0.5).set_trans(Tween.TRANS_SINE)
+		_guide_tween.tween_property(sb, "shadow_size", 5, 0.5).set_trans(Tween.TRANS_SINE)
+		return
 	match hint:
 		Hint.HOVER:
 			sb = Palette.box(Palette.PAPER, Palette.DROP_HINT, 3, 6, 10.0)

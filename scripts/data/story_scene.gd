@@ -13,6 +13,8 @@ extends Resource
 @export var after_runs: Dictionary = {}
 ## これらの場面を見たあとでないと出ない
 @export var requires_seen: Array[StringName] = []
+## 見終わったあと、チュートリアルの冒険に進む場面か
+@export var starts_tutorial := false
 ## 手がかり帳に載せる場合の見出しと要約（空なら手がかりではない）
 @export var clue_title: String
 @export var clue_summary: String

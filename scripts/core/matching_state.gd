@@ -25,6 +25,8 @@ var learned: Array[StringName] = []
 var blank_owner: Dictionary = {}
 ## 訂正箇所（ノートの記述が間違っているかもしれない場所）の id
 var fix_ids: Dictionary = {}
+## チュートリアル: 時間は止まり、間違えても時間は減らず、正しくやれば必ず成功する
+var tutorial := false
 ## 道具の効果。時間の倍率と、不一致ペナルティの倍率
 var time_scale := 1.0
 var penalty_scale := 1.0
@@ -75,7 +77,7 @@ func begin_next_event() -> bool:
 
 ## 時間を進める。ちょうど時間切れになった瞬間だけ true を返す。
 func tick(delta: float) -> bool:
-	if current == null or resolved or time_left <= 0.0:
+	if current == null or resolved or time_left <= 0.0 or tutorial:
 		return false
 	time_left = maxf(0.0, time_left - delta)
 	return time_left <= 0.0
@@ -106,7 +108,8 @@ func drop(keyword_id: StringName, target_id: StringName) -> DropResult:
 			filled_blanks[target_id] = true
 			learned.append(target_id)
 		return DropResult.MATCHED
-	time_left = maxf(0.0, time_left - Rules.MISMATCH_PENALTY_SEC * penalty_scale)
+	if not tutorial:
+		time_left = maxf(0.0, time_left - Rules.MISMATCH_PENALTY_SEC * penalty_scale)
 	return DropResult.MISMATCH
 
 
@@ -119,6 +122,9 @@ func resolve(chosen: StringName, rng: RandomNumberGenerator) -> Dictionary:
 	var stat_value := adventurer.stat_for(chosen)
 	var roll := rng.randi_range(1, Rules.DICE_SIDES)
 	var res := Judge.resolve(current.base_target, mod, stat_value, roll)
+	if tutorial and matched and chosen == current.required_stat:
+		res["success"] = true
+		res["crit_fail"] = false
 	var loss := 0.0
 	if res["crit_fail"]:
 		loss = Rules.CRIT_FAIL_REWARD_LOSS

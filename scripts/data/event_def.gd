@@ -17,3 +17,5 @@ extends Resource
 @export var fail_text: String
 ## 冒険者のスケッチ（assets/illustrations/sketches/<この名前>.png）。空なら絵なし
 @export var sketch: StringName
+## チュートリアルの案内文。キー: report（文字送り中）, drag（運ぶ言葉と行き先を示す）, wrong_drop, matched, command（選ぶ指示を示す）, wrong_command, result
+@export var coach: Dictionary = {}

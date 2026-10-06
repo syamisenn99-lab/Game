@@ -44,6 +44,17 @@ var _portrait_rect: TextureRect
 ## 冒険者のスケッチ（絵のファイルがあるときだけ）。文字送りが終わったら、ふわっと出る
 var _sketch_frame: Control
 var _sketch_shown := false
+var _report_done := false
+## チュートリアル（プロローグのあとの最初の冒険）の最中か。案内の吹き出しが出て、時間は止まる
+var _tutorial := false
+var _coach_row: PanelContainer
+var _coach_label: Label
+var _skip_tutorial_button: Button
+var _guided_chips: Array[KeywordChip] = []
+var _guide_target_view: NoteEntryView
+var _guide_target_slot: BlankSlot
+var _guided_button: Button
+var _guide_button_tween: Tween
 var _log_scroll: ScrollContainer
 var _mute_button: Button
 ## 探索終了時の精算の結果（GameSession.settle の戻り値）
@@ -52,19 +63,28 @@ var settlement: Dictionary = {}
 
 func _ready() -> void:
 	rng.randomize()
+	_tutorial = GameSession.tutorial_active
 	_build_ui()
 	var entries := SampleData.entries()
 	_entries = entries
 	GameSession.load_notebook()
-	var adventurer := SampleData.adventurer(GameSession.adventurer_id)
-	state = MatchingState.new(adventurer, SampleData.events(adventurer.id), entries, GameSession.filled_blanks)
-	# 買った道具の効果
-	if GameSession.has_item(&"hourglass"):
-		state.time_scale = Rules.HOURGLASS_TIME_SCALE
-	if GameSession.has_item(&"sticky"):
-		state.penalty_scale = Rules.STICKY_PENALTY_SCALE
-	# パニックになりやすい冒険者ほど、間違えたときに余計に時間を失う
-	state.penalty_scale *= adventurer.panic_factor
+	if _tutorial:
+		# チュートリアル: 幼なじみと、3つの短い場面。本番のノート・お金・日数には影響しない（ノートは空の状態から）
+		var tutor := SampleData.adventurer(SampleData.CHILDHOOD)
+		state = MatchingState.new(tutor, SampleData.events(SampleData.TUTORIAL), entries, {})
+		state.tutorial = true
+		_start_tutorial_ui()
+	else:
+		var real := SampleData.adventurer(GameSession.adventurer_id)
+		state = MatchingState.new(real, SampleData.events(real.id), entries, GameSession.filled_blanks)
+		# 買った道具の効果
+		if GameSession.has_item(&"hourglass"):
+			state.time_scale = Rules.HOURGLASS_TIME_SCALE
+		if GameSession.has_item(&"sticky"):
+			state.penalty_scale = Rules.STICKY_PENALTY_SCALE
+		# パニックになりやすい冒険者ほど、間違えたときに余計に時間を失う
+		state.penalty_scale *= real.panic_factor
+	var adventurer := state.adventurer
 	_name_label.text = "通信中: %s" % state.adventurer.display_name
 	var portrait := Illustrations.find("portraits", adventurer.id)
 	if portrait != null:
@@ -131,11 +151,38 @@ func _build_ui() -> void:
 	_time_label = _desk_label("")
 	_time_label.custom_minimum_size = Vector2(64, 0)
 	top.add_child(_time_label)
+	_skip_tutorial_button = Button.new()
+	_skip_tutorial_button.text = "チュートリアルをとばす"
+	_skip_tutorial_button.custom_minimum_size = Vector2(190, 32)
+	_skip_tutorial_button.visible = false
+	_skip_tutorial_button.pressed.connect(_on_skip_tutorial)
+	top.add_child(_skip_tutorial_button)
 	_mute_button = Button.new()
 	_mute_button.text = Sfx.mute_button_text()
 	_mute_button.custom_minimum_size = Vector2(96, 32)
 	_mute_button.pressed.connect(_on_mute_pressed)
 	top.add_child(_mute_button)
+
+	# チュートリアルの案内（チュートリアル中だけ見える）
+	_coach_row = PanelContainer.new()
+	_coach_row.visible = false
+	_coach_row.add_theme_stylebox_override("panel", Palette.box(Color("fff3cf"), Color("e0a800"), 3, 10, 10.0))
+	root.add_child(_coach_row)
+	var coach_box := HBoxContainer.new()
+	coach_box.add_theme_constant_override("separation", 12)
+	_coach_row.add_child(coach_box)
+	var coach_face := TextureRect.new()
+	coach_face.custom_minimum_size = Vector2(52, 52)
+	coach_face.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	coach_face.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	coach_face.texture = Illustrations.find("portraits", SampleData.CHILDHOOD)
+	coach_box.add_child(coach_face)
+	_coach_label = Label.new()
+	_coach_label.autowrap_mode = TextServer.AUTOWRAP_ARBITRARY
+	_coach_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_coach_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_coach_label.add_theme_font_size_override("font_size", 21)
+	coach_box.add_child(_coach_label)
 
 	# 中央: 通信ログ（左）とノート（右）
 	var middle := HBoxContainer.new()
@@ -267,6 +314,7 @@ func _start_next_event() -> void:
 	_selected_chip = null
 	_last_whole_sec = 99
 	_set_command_hint(false)
+	_tutorial_clear_guides()
 	for view: NoteEntryView in _entry_views.values():
 		view.show_stamp(false)
 	_build_report()
@@ -274,11 +322,12 @@ func _start_next_event() -> void:
 	_dice_label.text = ""
 	_next_button.visible = false
 	_set_stat_buttons_enabled(true)
-	_event_label.text = "イベント %d / %d" % [state.event_index + 1, state.events.size()]
-	_reward_label.text = "持ち帰り報酬: %d" % int(state.reward)
+	_event_label.text = "%s %d / %d" % ["チュートリアル" if _tutorial else "イベント", state.event_index + 1, state.events.size()]
+	_reward_label.text = "" if _tutorial else "持ち帰り報酬: %d" % int(state.reward)
 	_timer_bar.max_value = state.event_time_limit
 	_update_timer_ui()
 	_refresh_suspects()
+	_coach("report")
 	if state.auto_matched:
 		_announce_known_note()
 
@@ -293,6 +342,7 @@ func _build_report() -> void:
 	_total_chars = 0
 	_sketch_frame = null
 	_sketch_shown = false
+	_report_done = false
 
 	var flow := HFlowContainer.new()
 	flow.add_theme_constant_override("h_separation", 0)
@@ -339,13 +389,23 @@ func _advance_typewriter(delta: float) -> void:
 	if int(_revealed) / 2 > before / 2:
 		Sfx.play(&"type")
 	if _revealed >= _total_chars:
-		_show_sketch()
+		_on_report_complete()
 
 
 func _reveal_all() -> void:
 	_revealed = float(_total_chars)
 	_apply_reveal()
+	_on_report_complete()
+
+
+## 報告を読み終えた（文字送りが終わった）とき
+func _on_report_complete() -> void:
 	_show_sketch()
+	if _report_done:
+		return
+	_report_done = true
+	if _tutorial:
+		_tutorial_guide_drag()
 
 
 ## 冒険者の描いたスケッチを、紙に貼ったように見せる
@@ -395,6 +455,12 @@ func _apply_reveal() -> void:
 
 
 func _update_timer_ui() -> void:
+	if _tutorial:
+		_timer_bar.max_value = 1.0
+		_timer_bar.value = 1.0
+		_timer_bar.modulate = Color.WHITE
+		_time_label.text = "練習"
+		return
 	_timer_bar.value = state.time_left
 	_time_label.text = "%.1f" % state.time_left
 	var low := state.time_left < state.event_time_limit * 0.3
@@ -552,9 +618,17 @@ func _on_keyword_dropped(keyword_id: StringName, target_id: StringName) -> void:
 			Effects.float_text(_overlay, "訂正！" if state.is_fix(target_id) else "照合！", at + Vector2(0, -24), Palette.OK)
 			_set_command_hint(true)
 			_refresh_suspects()
-			GameSession.save_notebook()
+			if _tutorial:
+				_tutorial_clear_guides()
+				_coach_matched()
+			else:
+				GameSession.save_notebook()
 		MatchingState.DropResult.MISMATCH:
-			_line_label.text = "うーん、ここじゃない気がする…（時間が %.1f 秒減った）" % (Rules.MISMATCH_PENALTY_SEC * state.penalty_scale)
+			if _tutorial:
+				_line_label.text = "うーん、ここじゃないみたい。"
+				_coach("wrong_drop")
+			else:
+				_line_label.text = "うーん、ここじゃない気がする…（時間が %.1f 秒減った）" % (Rules.MISMATCH_PENALTY_SEC * state.penalty_scale)
 			var at := get_global_mouse_position()
 			if view != null:
 				view.flash(Color(1.0, 0.6, 0.6))
@@ -562,9 +636,10 @@ func _on_keyword_dropped(keyword_id: StringName, target_id: StringName) -> void:
 			Sfx.play(&"mismatch")
 			Effects.burst(_overlay, at, Palette.NG, 12, false)
 			Effects.float_text(_overlay, "ちがう…", at + Vector2(0, -24), Palette.NG, 26)
-			var bar_end := _timer_bar.get_global_rect().get_center()
-			Effects.float_text(_overlay, "-%.1f秒" % (Rules.MISMATCH_PENALTY_SEC * state.penalty_scale), bar_end + Vector2(0, 36), Palette.NG, 26)
-			_update_timer_ui()
+			if not _tutorial:
+				var bar_end := _timer_bar.get_global_rect().get_center()
+				Effects.float_text(_overlay, "-%.1f秒" % (Rules.MISMATCH_PENALTY_SEC * state.penalty_scale), bar_end + Vector2(0, 36), Palette.NG, 26)
+				_update_timer_ui()
 
 
 func _view_for_target(target_id: StringName) -> NoteEntryView:
@@ -575,6 +650,16 @@ func _view_for_target(target_id: StringName) -> NoteEntryView:
 func _on_stat_chosen(stat: StringName) -> void:
 	if _phase == Phase.REPORTING:
 		Sfx.play(&"click")
+		# チュートリアルでは、手順どおりに進める（先に照合する、正しい指示を選ぶ）
+		if _tutorial:
+			if not state.matched:
+				Sfx.play(&"mismatch")
+				_coach_text("まず、黄色くハイライトされた言葉を、ノートに運ぼう。指示を出すのは、そのあとだよ。")
+				return
+			if stat != state.current.required_stat:
+				Sfx.play(&"mismatch")
+				_coach("wrong_command")
+				return
 	_resolve(stat)
 
 
@@ -633,6 +718,9 @@ func _resolve(chosen: StringName) -> void:
 		_line_label.text += "（大失敗…！）"
 	_reward_label.text = "持ち帰り報酬: %d" % int(state.reward)
 	_next_button.text = "次へ" if state.has_next() else "探索を終える"
+	if _tutorial:
+		_tutorial_clear_guides()
+		_coach("result")
 	_next_button.visible = true
 	_phase = Phase.RESULT
 
@@ -648,6 +736,9 @@ func _format_result(res: Dictionary) -> String:
 
 func _show_summary() -> void:
 	_phase = Phase.SUMMARY
+	if _tutorial:
+		_show_tutorial_summary()
+		return
 	var dim := ColorRect.new()
 	dim.color = Color(0, 0, 0, 0.6)
 	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -714,3 +805,144 @@ func _settle_line(left: String, right: String, color: Color) -> Label:
 	label.text = "%s　　%s" % [left, right]
 	label.add_theme_color_override("font_color", color)
 	return label
+
+
+# ---------------------------------------------------------------- チュートリアル
+
+## チュートリアルの見た目にする（案内の吹き出しを出し、お金の表示などを隠す）
+func _start_tutorial_ui() -> void:
+	_coach_row.visible = true
+	_skip_tutorial_button.visible = true
+	_reward_label.visible = false
+	_timer_bar.visible = false
+
+
+## 案内文を出す。キーは EventDef.coach のもの
+func _coach(key: String) -> void:
+	if not _tutorial or state == null or state.current == null:
+		return
+	var text: String = state.current.coach.get(key, "")
+	if text != "":
+		_coach_text(text)
+
+
+func _coach_text(text: String) -> void:
+	if not _tutorial:
+		return
+	_coach_label.text = text
+	_coach_row.modulate = Color(1.0, 1.0, 0.7)
+	create_tween().tween_property(_coach_row, "modulate", Color.WHITE, 0.5)
+
+
+## 報告を読み終えたら、運ぶ言葉と、行き先を、金色に光らせて示す
+func _tutorial_guide_drag() -> void:
+	if state.matched or state.current == null:
+		return
+	_coach("drag")
+	var target_id: StringName = &""
+	var keyword_id: StringName = &""
+	for kw in state.current.keyword_targets:
+		keyword_id = StringName(kw)
+		target_id = StringName(state.current.keyword_targets[kw])
+	for chip in _chips:
+		if chip.keyword_id == keyword_id:
+			chip.set_guide(true)
+			_guided_chips.append(chip)
+	var view := _view_for_target(target_id)
+	if view == null:
+		return
+	# 行き先のページを、自動で開く
+	for i in _tabs.get_tab_count():
+		if _tabs.get_tab_control(i).is_ancestor_of(view):
+			_tabs.current_tab = i
+	if view.slots.has(target_id):
+		_guide_target_slot = view.slots[target_id]
+		_guide_target_slot.set_guide(true)
+	else:
+		_guide_target_view = view
+		view.set_guide(true)
+
+
+## 照合できたとき: ノートの内容を伝え、選ぶ指示を光らせる
+func _coach_matched() -> void:
+	var matched_text: String = state.current.coach.get("matched", "")
+	var command_text: String = state.current.coach.get("command", "")
+	_coach_text((matched_text + "\n" + command_text).strip_edges())
+	var button := _stat_buttons.get(state.current.required_stat) as Button
+	if button != null:
+		_guided_button = button
+		button.pivot_offset = button.size / 2.0
+		_guide_button_tween = create_tween().set_loops()
+		_guide_button_tween.tween_property(button, "scale", Vector2(1.14, 1.14), 0.45).set_trans(Tween.TRANS_SINE)
+		_guide_button_tween.tween_property(button, "scale", Vector2.ONE, 0.45).set_trans(Tween.TRANS_SINE)
+
+
+func _tutorial_clear_guides() -> void:
+	for chip in _guided_chips:
+		if is_instance_valid(chip):
+			chip.set_guide(false)
+	_guided_chips.clear()
+	if _guide_target_view != null and is_instance_valid(_guide_target_view):
+		_guide_target_view.set_guide(false)
+	if _guide_target_slot != null and is_instance_valid(_guide_target_slot):
+		_guide_target_slot.set_guide(false)
+	_guide_target_view = null
+	_guide_target_slot = null
+	if _guide_button_tween != null:
+		_guide_button_tween.kill()
+		_guide_button_tween = null
+	if _guided_button != null and is_instance_valid(_guided_button):
+		_guided_button.scale = Vector2.ONE
+	_guided_button = null
+
+
+func _on_skip_tutorial() -> void:
+	Sfx.play(&"click")
+	_finish_tutorial()
+
+
+## チュートリアルを終えて、続きの場面（プロローグのつづき）へ
+func _finish_tutorial() -> void:
+	GameSession.mark_seen(&"tutorial")
+	GameSession.tutorial_active = false
+	GameSession.go_to(get_tree(), PREP_SCENE)
+
+
+func _show_tutorial_summary() -> void:
+	var dim := ColorRect.new()
+	dim.color = Color(0, 0, 0, 0.6)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(dim)
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(center)
+	var panel := PanelContainer.new()
+	panel.add_theme_stylebox_override("panel", Palette.box(Palette.PAPER, Palette.INK, 3, 8, 24.0))
+	center.add_child(panel)
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 10)
+	panel.add_child(vbox)
+	var title := Label.new()
+	title.text = "チュートリアル完了！"
+	title.add_theme_font_size_override("font_size", 32)
+	vbox.add_child(title)
+	for text in [
+		"・黄色い言葉を、ノートの項目へ運んで、照合する",
+		"・ノートの空欄「？？？」を、見たことで埋めて、育てる",
+		"・ノートの間違いを、報告で訂正する",
+		"・照合したら、戦闘・探索・回避から、合う指示を選ぶ",
+	]:
+		var line := Label.new()
+		line.text = text
+		vbox.add_child(line)
+	var note := Label.new()
+	note.text = "ここからが、本番。本番では、制限時間があるよ。"
+	note.add_theme_color_override("font_color", Palette.INK_FAINT)
+	vbox.add_child(note)
+	var next := Button.new()
+	next.text = "つづきを見る"
+	next.custom_minimum_size = Vector2(0, 48)
+	next.pressed.connect(func() -> void:
+		Sfx.play(&"click")
+		_finish_tutorial())
+	vbox.add_child(next)

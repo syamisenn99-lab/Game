@@ -1,12 +1,33 @@
 class_name SampleData
 extends RefCounted
-## MVP サンプルシナリオ（幼なじみ・第1層）。設計書 §8 に対応。
+## MVP サンプルシナリオ（幼なじみ・傭兵）。設計書 §8 に対応。
+
+const CHILDHOOD := &"childhood"
+const MERCENARY := &"mercenary"
 
 
-static func adventurer() -> Adventurer:
+## 選択画面に並べる冒険者
+static func adventurers() -> Array[Adventurer]:
+	var list: Array[Adventurer] = []
+	list.append(adventurer(CHILDHOOD))
+	list.append(adventurer(MERCENARY))
+	return list
+
+
+static func adventurer(id: StringName = CHILDHOOD) -> Adventurer:
 	var a := Adventurer.new()
-	a.display_name = "幼なじみ"
-	a.stats = {&"battle": 3, &"explore": 4, &"evade": 3}
+	a.id = id
+	if id == MERCENARY:
+		a.display_name = "傭兵"
+		a.tagline = "自由を買い戻すため、一気に稼ぎたいドライな戦闘屋"
+		a.report_style = "短く事務的。「割に合うか」で判断する。報告は正確だが、遺物や仕掛けの手がかりは「金にならん」と流しがち。"
+		a.chars_per_sec = 32.0
+		a.stats = {&"battle": 5, &"explore": 2, &"evade": 3}
+	else:
+		a.display_name = "幼なじみ"
+		a.tagline = "あなたに元気になってほしい、姉を一緒に探してくれる冒険者"
+		a.report_style = "ふつう。見たことを素直に、感じたままに伝えてくれる。"
+		a.stats = {&"battle": 3, &"explore": 4, &"evade": 3}
 	return a
 
 
@@ -29,10 +50,20 @@ static func entries() -> Array[NoteEntry]:
 		"目が光る石像は台座に隠しスイッチがある。台座をよく調べて見つけて押せば止まる。壊そうとすると作動する。"))
 	list.append(_entry(&"pit_trap", &"traps", "落とし穴",
 		"床の色が違う場所は踏まずに避けて通ること。"))
+	list.append(_entry(&"geo_pattern", &"relics", "壁や床の幾何学模様",
+		"壁と床に同じ幾何学模様があるのは、仕掛けの合図。模様をたどってよく調べると、隠された扉が見つかる。", {}, 0))
+	list.append(_entry(&"old_tablet", &"relics", "古い石板",
+		"文字が刻まれた石板は、古代の記録。持ち帰れば高く売れるが、とても重い。"))
 	return list
 
 
-static func events() -> Array[EventDef]:
+static func events(id: StringName = CHILDHOOD) -> Array[EventDef]:
+	if id == MERCENARY:
+		return _mercenary_events()
+	return _childhood_events()
+
+
+static func _childhood_events() -> Array[EventDef]:
 	var list: Array[EventDef] = []
 	list.append(_event(&"e1_mushroom",
 		"あっ、見て！洞窟の隅に[kw:mushroom]青い斑点のキノコ[/kw]が生えてる。おいしそう…食べても平気かな？",
@@ -60,6 +91,43 @@ static func _entry_event_beast() -> EventDef:
 		"松明で怯んだ…ってことは、火が苦手なんだ！ノートに書いておくね。",
 		"火を突きつけながら押し返したら、獣は唸って去っていったよ。",
 		"押し切れなくて、飛びかかられて荷物の一部を落としちゃった…")
+
+
+## 傭兵のシナリオ。報告は短く事務的で、「割に合うか」で判断する。遺物や仕掛けの手がかりは流しがち。
+static func _mercenary_events() -> Array[EventDef]:
+	var list: Array[EventDef] = []
+	list.append(_merc_event(&"m1_bats",
+		"天井にコウモリ。三体。[kw:bat]天井の群れ[/kw]を相手にしても、報酬は出ない。損だ。迂回ルートを出せ。",
+		&"evade", 12, {&"bat": &"cave_bat"},
+		"音に弱くて、刺激しなければいい…静かに離れて通ろう。",
+		"静かに迂回した。損失なし。",
+		"気づかれた。多少、消耗した。"))
+	list.append(_merc_event(&"m2_beast",
+		"獣が一体。爪が長い。[kw:torch]松明を向けたら、退いた[/kw]。戦えば報酬に見合う。判断を。",
+		&"battle", 13, {&"torch": &"beast_aversion"},
+		"松明で退いた…火が苦手ってことだな。ノートに書いておく。",
+		"叩き伏せた。報酬に見合う戦いだった。",
+		"押し切れなかった。損害が出た。"))
+	list.append(_merc_event(&"m3_pattern",
+		"壁に模様。どうでもいい。…[kw:pattern]床の石にも同じ模様[/kw]があるが、金にならん。先へ進むぞ。",
+		&"explore", 13, {&"pattern": &"geo_pattern"},
+		"壁と床に同じ模様…仕掛けの合図だって、ノートに書いてある。調べさせよう。",
+		"模様をたどると、壁に隠し扉。……報酬の足しにはなる。",
+		"何も出なかった。時間の無駄だったな。"))
+	list.append(_merc_event(&"m4_statue",
+		"石像だ。目が光る。壊せば早い。…[kw:statue]この石像[/kw]、壊すぞ。止めるなら今だ。",
+		&"explore", 13, {&"statue": &"statue_trap"},
+		"壊すと作動する、ってノートに書いてある。台座を調べさせよう。",
+		"台座にスイッチ。壊すより安く済んだな。",
+		"止まらなかったか。…荷が少し減った。"))
+	return list
+
+
+static func _merc_event(id: StringName, report: String, stat: StringName, base: int,
+		targets: Dictionary, correct_line: String, success: String, fail: String) -> EventDef:
+	var ev := _event(id, report, stat, base, targets, correct_line, success, fail)
+	ev.time_limit = 20.0
+	return ev
 
 
 ## 食い違い: ノートには「触っても無害」とあるが、報告では触ってしびれた。ノートを訂正して、回避を選ぶ。

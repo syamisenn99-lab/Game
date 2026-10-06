@@ -27,6 +27,9 @@ func _run() -> void:
 	await _test_real_drag()
 	await _test_effects()
 	await _test_slot_hover()
+	_test_mercenary_data()
+	await _test_start_screen()
+	await _test_mercenary_flow()
 	print("%d checks, %d failures" % [_checks, _failures])
 	quit(1 if _failures > 0 else 0)
 
@@ -302,6 +305,79 @@ func _test_slot_hover() -> void:
 	_check(screen.state.matched and slot.filled, "drop: the large slot accepts the torch")
 	_check(slot.hint == BlankSlot.Hint.NONE and entry.hint == NoteEntryView.Hint.NONE, "hover: highlights are cleared after the drop")
 	screen.queue_free()
+	await _frames(2)
+
+
+## 傭兵のシナリオのデータ（各イベントの正解が、ノートの正しい項目に結びついている）
+func _test_mercenary_data() -> void:
+	var merc := SampleData.adventurer(SampleData.MERCENARY)
+	_check(merc.display_name == "傭兵" and merc.stat_for(&"battle") > merc.stat_for(&"explore"), "merc: strong in battle, weak in explore")
+	_check(merc.chars_per_sec > SampleData.adventurer(SampleData.CHILDHOOD).chars_per_sec, "merc: reports come in faster")
+	var events := SampleData.events(SampleData.MERCENARY)
+	_check(events.size() == 4, "merc: four events (%d)" % events.size())
+	var state := MatchingState.new(merc, events, SampleData.entries())
+	var expected := [&"evade", &"battle", &"explore", &"explore"]
+	var i := 0
+	while state.begin_next_event():
+		var ev := state.current
+		_check(ev.required_stat == expected[i], "merc: event %d asks for the expected command" % (i + 1))
+		var kw: StringName = ev.keyword_targets.keys()[0]
+		var target: StringName = ev.keyword_targets[kw]
+		_check(state.drop(kw, target) == MatchingState.DropResult.MATCHED, "merc: event %d matches by the intended keyword" % (i + 1))
+		_check(ReportParser.parse(ev.report).any(func(seg: Dictionary) -> bool: return seg["kw"] == kw), "merc: event %d report contains its keyword" % (i + 1))
+		i += 1
+	_check(i == 4, "merc: iterated all events")
+	# 手がかりを流しがちな傭兵: 3つ目のキーワードは「金にならん」と一緒に流される
+	_check(events[2].report.contains("金にならん"), "merc: the relic clue is brushed off in the report")
+
+
+## 選択画面: 2人が並び、選ぶとセッションに保存される
+func _test_start_screen() -> void:
+	var screen: StartScreen = load("res://scenes/start_screen.tscn").instantiate()
+	root.add_child(screen)
+	await _frames(3)
+	_check(screen.cards.size() == 2 and screen.cards.has(SampleData.MERCENARY) and screen.cards.has(SampleData.CHILDHOOD), "start: both adventurers are offered")
+	screen.select(SampleData.MERCENARY, false)
+	_check(GameSession.adventurer_id == SampleData.MERCENARY, "start: the choice is remembered")
+	screen.select(SampleData.CHILDHOOD, false)
+	_check(GameSession.adventurer_id == SampleData.CHILDHOOD, "start: the choice can be changed")
+	screen.queue_free()
+	await _frames(2)
+
+
+## 傭兵で最後まで遊ぶ（実際の画面を通す）
+func _test_mercenary_flow() -> void:
+	GameSession.adventurer_id = SampleData.MERCENARY
+	var screen: MatchingScreen = load("res://scenes/matching_screen.tscn").instantiate()
+	root.add_child(screen)
+	await _frames(3)
+	_check(screen._name_label.text.contains("傭兵"), "merc ui: the header shows the mercenary")
+	_check(screen._tabs.get_tab_count() == 4, "merc ui: the relics page is in the note (%d tabs)" % screen._tabs.get_tab_count())
+	var steps := [
+		[&"bat", &"cave_bat", &"evade"],
+		[&"torch", &"beast_aversion", &"battle"],
+		[&"pattern", &"geo_pattern", &"explore"],
+		[&"statue", &"statue_trap", &"explore"],
+	]
+	for n in steps.size():
+		if n > 0:
+			screen._start_next_event()
+			await _frames(3)
+		screen._reveal_all()
+		await _frames(2)
+		var step: Array = steps[n]
+		screen._on_keyword_dropped(step[0], step[1])
+		_check(screen.state.matched, "merc ui: event %d is matched" % (n + 1))
+		screen._on_stat_chosen(step[2])
+		await create_timer(1.0).timeout
+	_check(screen.state.results.size() == 4, "merc ui: four events resolved")
+	for res in screen.state.results:
+		_check(res["target"] == res["base_target"] + Rules.MOD_MATCHED_CORRECT_STAT, "merc ui: correct play lowers the target")
+	screen._start_next_event()
+	await _frames(2)
+	_check(screen._phase == MatchingScreen.Phase.SUMMARY, "merc ui: summary at the end")
+	screen.queue_free()
+	GameSession.adventurer_id = SampleData.CHILDHOOD
 	await _frames(2)
 
 

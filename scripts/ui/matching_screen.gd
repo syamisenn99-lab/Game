@@ -5,7 +5,8 @@ extends Control
 
 enum Phase { REPORTING, ROLLING, RESULT, SUMMARY }
 
-const PAGE_TITLES := {&"plants": "植物", &"monsters": "魔物", &"traps": "罠"}
+const START_SCENE := "res://scenes/start_screen.tscn"
+const PAGE_TITLES := {&"plants": "植物", &"monsters": "魔物", &"traps": "罠", &"relics": "遺物"}
 
 var state: MatchingState
 var rng := RandomNumberGenerator.new()
@@ -45,7 +46,8 @@ func _ready() -> void:
 	_build_ui()
 	var entries := SampleData.entries()
 	_entries = entries
-	state = MatchingState.new(SampleData.adventurer(), SampleData.events(), entries)
+	var adventurer := SampleData.adventurer(GameSession.adventurer_id)
+	state = MatchingState.new(adventurer, SampleData.events(adventurer.id), entries)
 	_name_label.text = "通信中: %s" % state.adventurer.display_name
 	_build_notebook()
 	_start_next_event()
@@ -64,21 +66,7 @@ func _process(delta: float) -> void:
 # ---------------------------------------------------------------- 画面構築
 
 func _build_ui() -> void:
-	var th := Theme.new()
-	th.default_font_size = 22
-	th.set_color("font_color", "Label", Palette.INK)
-	# 机の上の道具らしい配色（コントラストを確保する）
-	th.set_stylebox("normal", "Button", Palette.box(Palette.INK, Palette.INK, 0, 6, 8.0))
-	th.set_stylebox("hover", "Button", Palette.box(Color("4a3a2c"), Palette.HILITE_BG, 2, 6, 8.0))
-	th.set_stylebox("pressed", "Button", Palette.box(Color("1c150f"), Palette.HILITE_BG, 2, 6, 8.0))
-	th.set_stylebox("disabled", "Button", Palette.box(Palette.PAPER_DIM, Palette.INK_FAINT, 1, 6, 8.0))
-	th.set_stylebox("focus", "Button", StyleBoxEmpty.new())
-	for key in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
-		th.set_color(key, "Button", Palette.DESK_TEXT)
-	th.set_color("font_disabled_color", "Button", Palette.INK_FAINT)
-	th.set_stylebox("background", "ProgressBar", Palette.box(Color("24190f"), Color.TRANSPARENT, 0, 6, 0.0))
-	th.set_stylebox("fill", "ProgressBar", Palette.box(Palette.HILITE_BG, Color.TRANSPARENT, 0, 6, 0.0))
-	theme = th
+	theme = Palette.make_theme()
 
 	var desk := ColorRect.new()
 	desk.color = Palette.DESK
@@ -295,7 +283,7 @@ func _build_report() -> void:
 func _advance_typewriter(delta: float) -> void:
 	if _revealed >= _total_chars:
 		return
-	_revealed = minf(float(_total_chars), _revealed + Rules.CHARS_PER_SEC * delta)
+	_revealed = minf(float(_total_chars), _revealed + state.adventurer.chars_per_sec * delta)
 	_apply_reveal()
 
 
@@ -556,3 +544,8 @@ func _show_summary() -> void:
 	again.custom_minimum_size = Vector2(0, 44)
 	again.pressed.connect(func() -> void: get_tree().reload_current_scene())
 	vbox.add_child(again)
+	var choose := Button.new()
+	choose.text = "ガイドする人を選びなおす"
+	choose.custom_minimum_size = Vector2(0, 44)
+	choose.pressed.connect(func() -> void: get_tree().change_scene_to_file(START_SCENE))
+	vbox.add_child(choose)

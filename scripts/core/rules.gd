@@ -19,8 +19,6 @@ const FAIL_REWARD_LOSS := 0.10
 const CRIT_FAIL_REWARD_LOSS := 0.20
 const INITIAL_REWARD := 300.0
 
-## タイプライター表示の速度（文字/秒）
-const CHARS_PER_SEC := 25.0
 
 ## 指示（＝判定に使う能力値）。MVP では戦闘・探索・回避の3つに絞る
 const STATS: Array[StringName] = [&"battle", &"explore", &"evade"]

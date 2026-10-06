@@ -41,7 +41,12 @@ func setup(p_entry: NoteEntry, filled_blanks: Dictionary) -> void:
 	_stamp.add_theme_color_override("font_color", Palette.NG)
 	_stamp.visible = false
 	_stamp.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	head.add_child(_stamp)
+	# コンテナの子だと拡大・回転が毎フレーム戻されるので、素の Control に載せる
+	var stamp_holder := Control.new()
+	stamp_holder.custom_minimum_size = Vector2(80, 32)
+	stamp_holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	stamp_holder.add_child(_stamp)
+	head.add_child(stamp_holder)
 
 	var flow := HFlowContainer.new()
 	flow.add_theme_constant_override("h_separation", 0)
@@ -66,13 +71,27 @@ func setup(p_entry: NoteEntry, filled_blanks: Dictionary) -> void:
 				flow.add_child(label)
 
 
-func show_stamp(value: bool) -> void:
+func show_stamp(value: bool, animated: bool = false) -> void:
 	_stamp.visible = value
+	if value and animated:
+		_stamp.reset_size()
+		Effects.stamp_slam(_stamp)
+	elif not value:
+		_stamp.scale = Vector2.ONE
+		_stamp.modulate.a = 1.0
 
 
 func flash(color: Color) -> void:
 	modulate = color
 	create_tween().tween_property(self, "modulate", Color.WHITE, 0.4)
+
+
+func pop() -> void:
+	Effects.pop(self)
+
+
+func wobble() -> void:
+	Effects.wobble(self)
 
 
 func _apply_style(hint: bool) -> void:

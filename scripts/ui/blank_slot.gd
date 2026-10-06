@@ -41,6 +41,10 @@ func _apply_style(hint: bool) -> void:
 	add_theme_stylebox_override("panel", sb)
 
 
+func pop() -> void:
+	Effects.pop(self)
+
+
 func flash(color: Color) -> void:
 	modulate = color
 	create_tween().tween_property(self, "modulate", Color.WHITE, 0.4)

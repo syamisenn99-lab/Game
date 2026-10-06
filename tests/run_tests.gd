@@ -25,6 +25,7 @@ func _run() -> void:
 	_test_state()
 	await _test_ui_flow()
 	await _test_real_drag()
+	await _test_effects()
 	print("%d checks, %d failures" % [_checks, _failures])
 	quit(1 if _failures > 0 else 0)
 
@@ -159,6 +160,32 @@ func _test_ui_flow() -> void:
 	screen._start_next_event()
 	await _frames(2)
 	_check(screen._phase == MatchingScreen.Phase.SUMMARY, "ui: summary after the last event")
+	screen.queue_free()
+	await _frames(2)
+
+
+## ドロップ結果の演出（出て、終わったら片付く）
+func _test_effects() -> void:
+	root.size = Vector2i(1280, 720)
+	var screen: MatchingScreen = load("res://scenes/matching_screen.tscn").instantiate()
+	root.add_child(screen)
+	await _frames(3)
+	screen._reveal_all()
+	await _frames(3)
+	var wrong: NoteEntryView = screen._entry_views[&"glow_moss"]
+	screen._on_keyword_dropped(&"mushroom", &"glow_moss")
+	await _frames(3)
+	_check(screen._overlay.get_child_count() > 0, "fx: mismatch spawns effects")
+	_check(absf(wrong.rotation) > 0.0, "fx: mismatch wobbles the entry")
+	var good: NoteEntryView = screen._entry_views[&"mushroom_poison"]
+	screen._on_keyword_dropped(&"mushroom", &"mushroom_poison")
+	await _frames(3)
+	_check(good._stamp.scale.x > 1.0, "fx: stamp slams in (scale %.2f)" % good._stamp.scale.x)
+	_check(good.scale.x > 1.0, "fx: entry pops (scale %.2f)" % good.scale.x)
+	await create_timer(1.8).timeout
+	_check(screen._overlay.get_child_count() == 0, "fx: effects are cleaned up (%d left)" % screen._overlay.get_child_count())
+	_check(is_zero_approx(wrong.rotation) and is_equal_approx(good.scale.x, 1.0), "fx: entries return to rest")
+	_check(is_equal_approx(good._stamp.scale.x, 1.0) and is_equal_approx(good._stamp.modulate.a, 1.0), "fx: stamp settles")
 	screen.queue_free()
 	await _frames(2)
 

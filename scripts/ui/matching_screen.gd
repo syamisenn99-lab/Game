@@ -33,6 +33,7 @@ var _stat_buttons: Dictionary = {}
 var _line_label: Label
 var _dice_label: Label
 var _next_button: Button
+var _overlay: Control
 
 
 func _ready() -> void:
@@ -185,6 +186,12 @@ func _build_ui() -> void:
 	_dice_label = Label.new()
 	_dice_label.add_theme_color_override("font_color", Palette.INK_FAINT)
 	bvbox.add_child(_dice_label)
+
+	# 演出用の最前面レイヤ（入力は受けない）
+	_overlay = Control.new()
+	_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_overlay)
 
 
 func _desk_label(text: String) -> Label:
@@ -348,15 +355,29 @@ func _on_keyword_dropped(keyword_id: StringName, target_id: StringName) -> void:
 	match state.drop(keyword_id, target_id):
 		MatchingState.DropResult.MATCHED:
 			_line_label.text = state.current.correct_line
+			var at := get_global_mouse_position()
 			if view != null:
-				view.show_stamp(true)
+				view.show_stamp(true, true)
 				view.flash(Color(0.7, 1.0, 0.75))
+				view.pop()
 				if state.is_blank(target_id) and view.slots.has(target_id):
-					(view.slots[target_id] as BlankSlot).set_filled(true)
+					var slot := view.slots[target_id] as BlankSlot
+					slot.set_filled(true)
+					slot.pop()
+					at = slot.get_global_rect().get_center()
+			Effects.burst(_overlay, at, Palette.HILITE_BG, 32)
+			Effects.burst(_overlay, at, Palette.OK, 14)
+			Effects.float_text(_overlay, "照合！", at + Vector2(0, -24), Palette.OK)
 		MatchingState.DropResult.MISMATCH:
 			_line_label.text = "うーん、ここじゃない気がする…（時間が %.1f 秒減った）" % Rules.MISMATCH_PENALTY_SEC
+			var at := get_global_mouse_position()
 			if view != null:
 				view.flash(Color(1.0, 0.6, 0.6))
+				view.wobble()
+			Effects.burst(_overlay, at, Palette.NG, 12, false)
+			Effects.float_text(_overlay, "ちがう…", at + Vector2(0, -24), Palette.NG, 26)
+			var bar_end := _timer_bar.get_global_rect().get_center()
+			Effects.float_text(_overlay, "-%.1f秒" % Rules.MISMATCH_PENALTY_SEC, bar_end + Vector2(0, 36), Palette.NG, 26)
 			_update_timer_ui()
 
 
@@ -385,6 +406,13 @@ func _resolve(chosen: StringName) -> void:
 		_dice_label.text = "d20 ... %d" % rng.randi_range(1, Rules.DICE_SIDES)
 		await get_tree().create_timer(0.06).timeout
 	_dice_label.text = _format_result(res)
+	var dice_at := _dice_label.get_global_rect().get_center()
+	if res["success"]:
+		Effects.burst(_overlay, dice_at, Palette.HILITE_BG, 36)
+		Effects.float_text(_overlay, "成功！", dice_at + Vector2(0, -40), Palette.OK, 36)
+	else:
+		Effects.burst(_overlay, dice_at, Palette.NG, 16, false)
+		Effects.float_text(_overlay, "大失敗…！" if res["crit_fail"] else "失敗…", dice_at + Vector2(0, -40), Palette.NG, 36)
 	_line_label.text = state.current.success_text if res["success"] else state.current.fail_text
 	if res["crit_fail"]:
 		_line_label.text += "（大失敗…！）"

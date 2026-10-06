@@ -85,6 +85,13 @@ static func entries() -> Array[NoteEntry]:
 	list.append(_entry(&"old_tablet", &"relics", "古い石板",
 		"文字が刻まれた石板は、古代の記録。{blank:tablet_light}を近づけると文字が浮かぶ。浮かんだ文字を調べれば、隠し部屋の場所が分かることがある。持ち帰れば高く売れるが、とても重い。",
 		{&"tablet_light": "灯り"}, 0))
+	# 謎の遺物: 冒険者ごとに、別の面だけを報告する。3つの断片がそろうと、正体を推理できる
+	list.append(_entry(&"black_cube", &"relics", "黒い立方体（第4層・調査中）",
+		"床の中央に置かれた、黒い立方体。表面は{blank:cube_cold}。触れた者は、{blank:cube_memory}らしい。近づくと、{blank:cube_voice}という。",
+		{&"cube_cold": "霜のつかない氷のように冷たい", &"cube_memory": "直前の記憶が曖昧になる", &"cube_voice": "聞き覚えのある声がする"}, 0))
+	list.append(_entry(&"cube_truth_note", &"relics", "立方体の正体（推理）",
+		"冷たさ、記憶、声。三つの断片が重なるなら、あの立方体は、{blank:cube_truth}ではないか。",
+		{&"cube_truth": "人の記憶を預かる「器」"}, 0))
 	return list
 
 
@@ -409,6 +416,44 @@ static func _noble_events() -> Array[EventDef]:
 	return list
 
 
+## 謎の遺物「黒い立方体」の報告。同じものを見ても、冒険者ごとに、別の面だけを話す。
+## すでにノートに書いてある断片は、もう出ない。幼なじみの最後の報告は、3つの断片がそろったときだけ出る（推理の材料がそろった合図）。
+static func relic_event(adventurer_id: StringName, filled: Dictionary) -> EventDef:
+	var ev: EventDef = null
+	if adventurer_id == MERCENARY and not filled.has(&"cube_cold"):
+		ev = _merc_event(&"r_merc",
+			"第4層。床に黒い箱。一辺、膝の高さ。攻撃は仕掛けてこない。…[kw:r_cold]手袋ごしでも骨まで冷える。なのに霜ひとつ付いていない[/kw]。金になるかは分からん。どうする。",
+			&"explore", 13, {&"r_cold": &"cube_cold"},
+			"冷たいのに霜が付かない…それだけ、ノートに書いておく。",
+			"手を引いた。それ以上は触っていない。……耳鳴りだけが、しばらく残った。",
+			"不用意に触れすぎた。手が痺れて、荷を少し落とした。")
+	elif adventurer_id == DOCTOR and not filled.has(&"cube_memory"):
+		ev = _timed(_event(&"r_doctor",
+			"あの、あの黒い箱に、同行者が触れたんです！ 脈は正常、瞳孔も普通、でも…[kw:r_memory]触れる直前の数分の出来事を、彼は思い出せない[/kw]んです！ 外傷はありません、でも、でも、[kw:r_pulse]脈が一瞬だけ止まった[/kw]ような気がして…どうすれば！",
+			&"explore", 14, {&"r_memory": &"cube_memory"},
+			"直前の記憶だけが抜けている…ノートに書いておくね。それ以上、触れさせないで。",
+			"同行者を箱から離したら、少しずつ、記憶が戻ってきたようです…でも、数分だけは、ずっと空白のままで…。",
+			"離れさせるのが遅れました…彼の様子が、まだおかしいです…。"), 15.0)
+	elif adventurer_id == NOBLE and not filled.has(&"cube_voice"):
+		ev = _timed(_event(&"r_noble",
+			"おお、これは…！ 黒曜石に似ているが、[kw:nb_cube_stone]表面の光沢は未知の組成[/kw]で、おそらく第零紀の…いや待て。[kw:nb_cube_script]側面に刻まれた、読めぬ古代文字[/kw]もあるが、それよりだ。[kw:r_voice]近づくと、聞き覚えのある声が、耳の奥で囁く[/kw]のだ。…私の、亡き母の声に、似ている。どうすればよい？",
+			&"explore", 14, {&"r_voice": &"cube_voice"},
+			"近づくと、聞き覚えのある声がする…ノートに書いておくね。それ以上、近づかないで。",
+			"後ずさると、声は遠のいた。…あれは、遺物が人の何かを、映しているのだろうか。",
+			"声に引き寄せられ、つい手を伸ばしてしまった…少し、荷物を落としたようだ。"), 30.0)
+	elif adventurer_id == CHILDHOOD and not filled.has(&"cube_truth") \
+			and filled.has(&"cube_cold") and filled.has(&"cube_memory") and filled.has(&"cube_voice"):
+		ev = _timed(_event(&"r_child",
+			"あのね、前に三人が見た黒い箱を、私も見つけたの。[kw:r_floor]床の模様が、箱を囲むように広がってる[/kw]。それで、[kw:r_truth]箱の中から、姉さんの声がして、私、昨日の晩ごはんを思い出せなくなったの。すごく、冷たい空気の中で[/kw]……ねえ、これって、何なの？",
+			&"explore", 13, {&"r_truth": &"cube_truth"},
+			"冷たさ、記憶、声…三つがそろった。これは、人の記憶を預かる「器」だ。",
+			"箱から離れたら、声はふっと消えた。……あの声は、姉さんが残した記憶の欠片なのかもしれない。",
+			"箱に呑まれそうになって、慌てて逃げた…少し、荷物を落としたよ。"), 20.0)
+	if ev != null:
+		ev.known_line = ""
+	return ev
+
+
 ## イベントの制限時間を変える
 static func _timed(ev: EventDef, seconds: float) -> EventDef:
 	ev.time_limit = seconds
@@ -466,6 +511,7 @@ const SKETCHES := {
 	&"m5_bats_again": &"bat", &"m6_tablet": &"tablet",
 	&"f1_mushroom": &"mushroom", &"f2_beast": &"beast", &"f3_moss": &"moss",
 	&"d1_rash": &"mushroom", &"d2_herb": &"herb", &"d3_numb": &"moss", &"d4_bats_high": &"bat",
+	&"r_merc": &"cube", &"r_doctor": &"cube", &"r_noble": &"cube", &"r_child": &"cube",
 	&"n1_pattern": &"pattern", &"n2_tablet": &"tablet", &"n3_statue": &"statue", &"n4_keyhole": &"keyhole",
 }
 

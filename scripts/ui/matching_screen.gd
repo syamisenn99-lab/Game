@@ -80,7 +80,12 @@ func _ready() -> void:
 		_start_guided_ui()
 	else:
 		var real := SampleData.adventurer(GameSession.adventurer_id)
-		state = MatchingState.new(real, SampleData.events(real.id), entries, GameSession.filled_blanks)
+		var real_events := SampleData.events(real.id)
+		# 謎の遺物（冒険者ごとに別の断片を報告する）。まだ分かっていない断片だけ、最後に付く
+		var relic := SampleData.relic_event(real.id, GameSession.filled_blanks)
+		if relic != null:
+			real_events.append(relic)
+		state = MatchingState.new(real, real_events, entries, GameSession.filled_blanks)
 		# 買った道具の効果
 		if GameSession.has_item(&"hourglass"):
 			state.time_scale = Rules.HOURGLASS_TIME_SCALE

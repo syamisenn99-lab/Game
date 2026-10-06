@@ -48,6 +48,7 @@ func _run() -> void:
 	_test_guided_rules()
 	await _test_guided_flow()
 	_test_story_data()
+	_test_relic()
 	_test_story_director()
 	await _test_story_screen()
 	await _test_story_in_prep()
@@ -496,6 +497,7 @@ func _test_mercenary_flow() -> void:
 		[&"statue", &"statue_trap", &"explore"],
 		[&"clap", &"bat_weak", &"battle"],
 		[&"glow_text", &"tablet_light", &"explore"],
+		[&"r_cold", &"cube_cold", &"explore"],
 	]
 	for n in steps.size():
 		if n > 0:
@@ -508,7 +510,7 @@ func _test_mercenary_flow() -> void:
 		_check(screen.state.matched, "merc ui: event %d is matched" % (n + 1))
 		screen._on_stat_chosen(step[2])
 		await create_timer(1.0).timeout
-	_check(screen.state.results.size() == 6, "merc ui: six events resolved")
+	_check(screen.state.results.size() == 7, "merc ui: seven events resolved")
 	for res in screen.state.results:
 		_check(res["target"] == res["base_target"] + Rules.MOD_MATCHED_CORRECT_STAT, "merc ui: correct play lowers the target")
 	screen._start_next_event()
@@ -565,12 +567,14 @@ func _test_doctor_and_noble_flow() -> void:
 			[&"herb", &"herb_effect", &"explore"],
 			[&"numb_d", &"moss_safe", &"evade"],
 			[&"d_bat", &"cave_bat", &"evade"],
+			[&"r_memory", &"cube_memory", &"explore"],
 		],
 		SampleData.NOBLE: [
 			[&"nb_pattern", &"geo_pattern", &"explore"],
 			[&"nb_light", &"tablet_light", &"explore"],
 			[&"nb_statue", &"statue_trap", &"explore"],
 			[&"nb_star", &"keyhole_shape", &"explore"],
+			[&"r_voice", &"cube_voice", &"explore"],
 		],
 	}
 	for adventurer_id in plans:
@@ -593,7 +597,7 @@ func _test_doctor_and_noble_flow() -> void:
 			_check(screen.state.matched, "flow %s: event %d is matched" % [adventurer_id, n + 1])
 			screen._on_stat_chosen(step[2])
 			await create_timer(1.0).timeout
-		_check(screen.state.results.size() == 4, "flow %s: four events resolved" % adventurer_id)
+		_check(screen.state.results.size() == 5, "flow %s: five events resolved" % adventurer_id)
 		screen._start_next_event()
 		await _frames(2)
 		_check(screen._phase == MatchingScreen.Phase.SUMMARY, "flow %s: summary at the end" % adventurer_id)
@@ -788,6 +792,32 @@ func _test_story_data() -> void:
 	# 世界観の説明が、プロローグに入っている（通信ログの「声だけが届く」の見出しをやめた代わり）
 	var prologue_text := "".join(StoryData.find(&"prologue").lines.map(func(l: Dictionary) -> String: return l["text"]))
 	_check(prologue_text.contains("声だけ") and prologue_text.contains("耳飾り") and prologue_text.contains("ノート"), "story data: the prologue explains the voice-only earring and the notebook")
+
+
+## 謎の遺物: 冒険者ごとに別の断片。そろうと、幼なじみの報告で正体を推理できる
+func _test_relic() -> void:
+	var filled := {}
+	for id in [SampleData.MERCENARY, SampleData.DOCTOR, SampleData.NOBLE]:
+		_check(SampleData.relic_event(id, filled) != null, "relic: %s reports a fragment" % id)
+	_check(SampleData.relic_event(SampleData.CHILDHOOD, filled) == null, "relic: the childhood friend has nothing to add yet")
+	filled[&"cube_cold"] = true
+	_check(SampleData.relic_event(SampleData.MERCENARY, filled) == null, "relic: a known fragment is not reported again")
+	filled[&"cube_memory"] = true
+	_check(SampleData.relic_event(SampleData.CHILDHOOD, filled) == null, "relic: two fragments are not enough")
+	filled[&"cube_voice"] = true
+	var finale := SampleData.relic_event(SampleData.CHILDHOOD, filled)
+	_check(finale != null and finale.keyword_targets.values().has(&"cube_truth"), "relic: three fragments unlock the deduction")
+	filled[&"cube_truth"] = true
+	_check(SampleData.relic_event(SampleData.CHILDHOOD, filled) == null, "relic: the deduction is reported once")
+	# 3人の報告は、それぞれ別の断片を指す
+	var targets := {}
+	for id in [SampleData.MERCENARY, SampleData.DOCTOR, SampleData.NOBLE]:
+		for t in SampleData.relic_event(id, {}).keyword_targets.values():
+			targets[t] = true
+	_check(targets.size() == 3, "relic: the three reports point to three different fragments (%d)" % targets.size())
+	var cube := SampleData.entries().filter(func(e: NoteEntry) -> bool: return e.id == &"black_cube")
+	_check(cube.size() == 1 and cube[0].blank_fills.size() == 3 and cube[0].page == &"relics", "relic: the note page has three blanks")
+	_check(Illustrations.find("sketches", &"cube", SampleData.MERCENARY) != null, "relic: the cube has a sketch")
 
 
 ## いつ、どの場面が出るか
@@ -1016,7 +1046,7 @@ func _test_carry_over() -> void:
 	_check(second.current.id == &"m2_beast" and second.auto_matched and second.auto_target == &"beast_aversion", "carry: the mercenary's beast event starts pre-matched")
 	_check(second.drop(&"torch", &"beast_aversion") == MatchingState.DropResult.IGNORED, "carry: no double matching")
 	_check(second.learned.is_empty(), "carry: nothing new is learned the second time")
-	_check(SampleData.growth_spots().size() == 8, "carry: the note has eight spots that can grow (%d)" % SampleData.growth_spots().size())
+	_check(SampleData.growth_spots().size() == 12, "carry: the note has twelve spots that can grow (%d)" % SampleData.growth_spots().size())
 	# 引数を省略した状態は、互いに共有されない
 	var a := MatchingState.new(SampleData.adventurer(), SampleData.events(), SampleData.entries())
 	var b := MatchingState.new(SampleData.adventurer(), SampleData.events(), SampleData.entries())
@@ -1071,16 +1101,16 @@ func _test_carry_over_ui() -> void:
 	var start: PrepScreen = load("res://scenes/prep_screen.tscn").instantiate()
 	root.add_child(start)
 	await _frames(3)
-	_check(start.notebook_label.text.contains("0 / 8"), "carry ui: the prep screen shows no growth at first (%s)" % start.notebook_label.text)
+	_check(start.notebook_label.text.contains("0 / 12"), "carry ui: the prep screen shows no growth at first (%s)" % start.notebook_label.text)
 	GameSession.filled_blanks[&"beast_aversion"] = true
 	GameSession.funds = 50
 	start._refresh()
-	_check(start.notebook_label.text.contains("1 / 8") and start.notebook_label.text.contains("火"), "carry ui: the prep screen shows what has been written (%s)" % start.notebook_label.text)
+	_check(start.notebook_label.text.contains("1 / 12") and start.notebook_label.text.contains("火"), "carry ui: the prep screen shows what has been written (%s)" % start.notebook_label.text)
 	_check(start.warning_label.text.contains("生活費"), "carry ui: low funds trigger a warning")
 	start.request_reset()
 	_check(GameSession.filled_blanks.has(&"beast_aversion") and GameSession.funds == 50, "carry ui: the first press only asks for confirmation")
 	start.request_reset()
-	_check(GameSession.filled_blanks.is_empty() and GameSession.funds == Rules.START_FUNDS and start.notebook_label.text.contains("0 / 8"), "carry ui: the second press resets everything")
+	_check(GameSession.filled_blanks.is_empty() and GameSession.funds == Rules.START_FUNDS and start.notebook_label.text.contains("0 / 12"), "carry ui: the second press resets everything")
 	start.queue_free()
 	await _frames(2)
 	_reset_session()

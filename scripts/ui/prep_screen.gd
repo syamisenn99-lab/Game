@@ -43,7 +43,7 @@ func _build_ui() -> void:
 	var margin := MarginContainer.new()
 	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
 	for side in ["left", "right", "top", "bottom"]:
-		margin.add_theme_constant_override("margin_" + side, 20)
+		margin.add_theme_constant_override("margin_" + side, 12)
 	add_child(margin)
 	var root := VBoxContainer.new()
 	root.add_theme_constant_override("separation", 12)
@@ -66,22 +66,28 @@ func _build_ui() -> void:
 	# 中央: 3つの棚
 	var middle := HBoxContainer.new()
 	middle.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	middle.add_theme_constant_override("separation", 14)
+	middle.add_theme_constant_override("separation", 10)
 	root.add_child(middle)
 
-	var guide_box := _shelf("ガイドする人", 1.5)
+	var guide_box := _shelf("ガイドする人", 1.7)
 	middle.add_child(guide_box["panel"])
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	grid.add_theme_constant_override("h_separation", 8)
+	grid.add_theme_constant_override("v_separation", 8)
+	(guide_box["list"] as VBoxContainer).add_child(grid)
 	for adventurer in SampleData.adventurers():
 		var card := _build_adventurer_card(adventurer)
-		(guide_box["list"] as VBoxContainer).add_child(card)
+		grid.add_child(card)
 		cards[adventurer.id] = card
 
-	var info_box := _shelf("情報を買う（ノートが育つ）", 1.0)
+	var info_box := _shelf("情報を買う", 1.0)
 	middle.add_child(info_box["panel"])
 	for offer in _offers:
 		(info_box["list"] as VBoxContainer).add_child(_build_shop_row(offer))
 
-	var item_box := _shelf("道具を買う", 0.85)
+	var item_box := _shelf("道具を買う", 0.8)
 	middle.add_child(item_box["panel"])
 	for item in _items:
 		(item_box["list"] as VBoxContainer).add_child(_build_shop_row(item))
@@ -165,19 +171,19 @@ func _build_adventurer_card(adventurer: Adventurer) -> PanelContainer:
 	if portrait != null:
 		var face := TextureRect.new()
 		face.texture = portrait
-		face.custom_minimum_size = Vector2(72, 72)
+		face.custom_minimum_size = Vector2(56, 56)
 		face.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		face.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		head.add_child(face)
 	var name_label := Label.new()
 	name_label.text = adventurer.display_name
-	name_label.add_theme_font_size_override("font_size", 28)
+	name_label.add_theme_font_size_override("font_size", 22)
 	head.add_child(name_label)
 	var spacer := Control.new()
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(spacer)
 	var button := Button.new()
-	button.custom_minimum_size = Vector2(130, 36)
+	button.custom_minimum_size = Vector2(80, 36)
 	button.pressed.connect(choose.bind(adventurer.id))
 	head.add_child(button)
 	select_buttons[adventurer.id] = button
@@ -211,11 +217,11 @@ func _build_shop_row(item: ShopItem) -> PanelContainer:
 	hbox.add_child(text_box)
 	var name_label := Label.new()
 	name_label.text = item.title
-	name_label.add_theme_font_size_override("font_size", 21)
+	name_label.add_theme_font_size_override("font_size", 19)
 	text_box.add_child(name_label)
 	text_box.add_child(_small(item.description, Palette.INK_FAINT))
 	var button := Button.new()
-	button.custom_minimum_size = Vector2(112, 44)
+	button.custom_minimum_size = Vector2(92, 44)
 	button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	button.pressed.connect(buy.bind(item.id))
 	hbox.add_child(button)
@@ -235,7 +241,7 @@ func _refresh() -> void:
 		(cards[id] as PanelContainer).add_theme_stylebox_override("panel",
 			Palette.box(Color("fff6d6") if selected else Palette.PAPER, GOLD if selected else Palette.PAPER_DIM, 4 if selected else 2, 8, 10.0))
 		var button := select_buttons[id] as Button
-		button.text = "選んでいる" if selected else "この人にする"
+		button.text = "選択中" if selected else "選ぶ"
 		button.disabled = selected
 
 	for id in shop_rows:

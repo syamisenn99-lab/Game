@@ -44,6 +44,7 @@ var _portrait_rect: TextureRect
 ## 冒険者のスケッチ（絵のファイルがあるときだけ）。文字送りが終わったら、ふわっと出る
 var _sketch_frame: Control
 var _sketch_shown := false
+var _log_scroll: ScrollContainer
 var _mute_button: Button
 ## 探索終了時の精算の結果（GameSession.settle の戻り値）
 var settlement: Dictionary = {}
@@ -62,6 +63,8 @@ func _ready() -> void:
 		state.time_scale = Rules.HOURGLASS_TIME_SCALE
 	if GameSession.has_item(&"sticky"):
 		state.penalty_scale = Rules.STICKY_PENALTY_SCALE
+	# パニックになりやすい冒険者ほど、間違えたときに余計に時間を失う
+	state.penalty_scale *= adventurer.panic_factor
 	_name_label.text = "通信中: %s" % state.adventurer.display_name
 	var portrait := Illustrations.find("portraits", adventurer.id)
 	if portrait != null:
@@ -152,10 +155,16 @@ func _build_ui() -> void:
 	log_title.text = "通信ログ（声だけが届く）"
 	log_title.add_theme_color_override("font_color", Palette.INK_FAINT)
 	log_vbox.add_child(log_title)
+	# 長い報告でも、画面全体が押し広げられないように、ログはスクロールできる枠に入れる
+	_log_scroll = ScrollContainer.new()
+	_log_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_log_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_log_scroll.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	log_vbox.add_child(_log_scroll)
 	_log_box = VBoxContainer.new()
-	_log_box.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_log_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_log_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	log_vbox.add_child(_log_box)
+	_log_scroll.add_child(_log_box)
 	var hint := Label.new()
 	hint.text = "黄色い語をノートへドラッグ（クリックで選んでノートをクリックでもOK）／ ログをクリックで文字送り"
 	hint.add_theme_font_size_override("font_size", 14)
@@ -350,7 +359,8 @@ func _make_sketch_frame(texture: Texture2D) -> Control:
 	frame.add_child(vbox)
 	var picture := TextureRect.new()
 	picture.texture = texture
-	picture.custom_minimum_size = Vector2(288, 216)
+	# 長い報告のときは、スケッチを小さくして、ログに収まるようにする
+	picture.custom_minimum_size = Vector2(160, 120) if _total_chars > 90 else Vector2(288, 216)
 	picture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	picture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	picture.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -370,6 +380,7 @@ func _show_sketch() -> void:
 		return
 	_sketch_shown = true
 	create_tween().tween_property(_sketch_frame, "modulate:a", 1.0, 0.5)
+
 
 
 func _apply_reveal() -> void:

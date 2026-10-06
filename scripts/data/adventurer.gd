@@ -9,6 +9,8 @@ extends Resource
 @export var report_style: String
 ## 報告の表示速度（文字/秒）。事務的で短い報告ほど速い
 @export var chars_per_sec: float = 25.0
+## 間違えたときに失う時間にかかる倍率。パニックになりやすい冒険者ほど大きい（1.0 = ふつう）
+@export var panic_factor: float = 1.0
 ## battle / explore / evade -> 値
 @export var stats: Dictionary = {}
 

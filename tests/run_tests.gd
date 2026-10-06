@@ -40,6 +40,8 @@ func _run() -> void:
 	await _test_start_screen()
 	await _test_economy()
 	await _test_mercenary_flow()
+	_test_new_adventurers_data()
+	await _test_doctor_and_noble_flow()
 	_test_carry_over()
 	await _test_carry_over_ui()
 	_test_illustrations()
@@ -375,14 +377,14 @@ func _test_start_screen() -> void:
 	var screen: PrepScreen = load("res://scenes/prep_screen.tscn").instantiate()
 	root.add_child(screen)
 	await _frames(3)
-	_check(screen.cards.size() == 2 and screen.cards.has(SampleData.MERCENARY) and screen.cards.has(SampleData.CHILDHOOD), "prep: both adventurers are offered")
+	_check(screen.cards.size() == 4 and screen.cards.has(SampleData.MERCENARY) and screen.cards.has(SampleData.CHILDHOOD) and screen.cards.has(SampleData.DOCTOR) and screen.cards.has(SampleData.NOBLE), "prep: all four adventurers are offered")
 	screen.choose(SampleData.MERCENARY)
 	_check(GameSession.adventurer_id == SampleData.MERCENARY, "prep: the choice is remembered")
 	_check((screen.select_buttons[SampleData.MERCENARY] as Button).disabled and not (screen.select_buttons[SampleData.CHILDHOOD] as Button).disabled, "prep: the chosen adventurer is marked")
 	screen.choose(SampleData.CHILDHOOD)
 	_check(GameSession.adventurer_id == SampleData.CHILDHOOD, "prep: the choice can be changed")
 	_check(screen.day_label.text == "1日目" and screen.funds_label.text.contains("200"), "prep: day and funds are shown (%s / %s)" % [screen.day_label.text, screen.funds_label.text])
-	_check(screen.shop_rows.size() == 8, "prep: six pieces of information and two items are for sale (%d)" % screen.shop_rows.size())
+	_check(screen.shop_rows.size() == 10, "prep: eight pieces of information and two items are for sale (%d)" % screen.shop_rows.size())
 	screen.queue_free()
 	await _frames(2)
 
@@ -499,6 +501,99 @@ func _test_mercenary_flow() -> void:
 	await _frames(2)
 
 
+## 医師と貴族のデータ（報告のクセが、遊びの違いになっている）
+func _test_new_adventurers_data() -> void:
+	var doctor := SampleData.adventurer(SampleData.DOCTOR)
+	var noble := SampleData.adventurer(SampleData.NOBLE)
+	_check(doctor.display_name == "医師" and noble.display_name == "没落貴族", "new adv: names")
+	_check(doctor.stat_for(&"battle") == 1 and noble.stat_for(&"battle") == 1, "new adv: neither can fight")
+	_check(noble.stat_for(&"explore") > noble.stat_for(&"evade"), "new adv: the noble is a scholar, not a runner")
+	_check(doctor.panic_factor > 1.0 and SampleData.adventurer(SampleData.CHILDHOOD).panic_factor == 1.0, "new adv: only the doctor panics")
+	_check(noble.chars_per_sec > doctor.chars_per_sec and doctor.chars_per_sec > SampleData.adventurer(SampleData.CHILDHOOD).chars_per_sec, "new adv: reports get faster and faster")
+
+	var d_events := SampleData.events(SampleData.DOCTOR)
+	var n_events := SampleData.events(SampleData.NOBLE)
+	_check(d_events.size() == 4 and n_events.size() == 4, "new adv: four events each")
+	for ev in d_events:
+		_check(is_equal_approx(ev.time_limit, 15.0), "new adv: doctor event %s is short (%.0fs)" % [ev.id, ev.time_limit])
+	for ev in n_events:
+		_check(is_equal_approx(ev.time_limit, 30.0), "new adv: noble event %s is long (%.0fs)" % [ev.id, ev.time_limit])
+		# 貴族の報告は長く、正解は1つで、残りはおとり
+		var segs := ReportParser.parse(ev.report)
+		var chips := segs.filter(func(seg: Dictionary) -> bool: return seg["kw"] != &"")
+		_check(ev.report.length() > 90, "new adv: the noble talks a lot in %s (%d chars)" % [ev.id, ev.report.length()])
+		_check(chips.size() >= 3 and ev.keyword_targets.size() == 1, "new adv: %s has decoy keywords (%d chips, 1 answer)" % [ev.id, chips.size()])
+		_check(chips.any(func(seg: Dictionary) -> bool: return ev.keyword_targets.has(seg["kw"])), "new adv: the answer is in the report of %s" % ev.id)
+	# おとりを運ぶと、どこへ置いても不一致で時間を失う
+	var state := MatchingState.new(noble, n_events, SampleData.entries())
+	state.begin_next_event()
+	var before := state.time_left
+	_check(state.drop(&"nb_pigment", &"geo_pattern") == MatchingState.DropResult.MISMATCH and state.time_left < before, "new adv: carrying a decoy costs time")
+	_check(state.drop(&"nb_pattern", &"geo_pattern") == MatchingState.DropResult.MATCHED, "new adv: the real keyword still matches")
+	# 医師はパニック: 間違いのロスが大きい
+	var d_state := MatchingState.new(doctor, d_events, SampleData.entries())
+	d_state.penalty_scale = doctor.panic_factor
+	d_state.begin_next_event()
+	var d_before := d_state.time_left
+	d_state.drop(&"rash", &"glow_moss")
+	_check(is_equal_approx(d_before - d_state.time_left, Rules.MISMATCH_PENALTY_SEC * 1.5), "new adv: the doctor loses more time for a mistake")
+
+
+## 医師・貴族で最後まで遊ぶ（実際の画面を通す）
+func _test_doctor_and_noble_flow() -> void:
+	var plans := {
+		SampleData.DOCTOR: [
+			[&"rash", &"mushroom_poison", &"evade"],
+			[&"herb", &"herb_effect", &"explore"],
+			[&"numb_d", &"moss_safe", &"evade"],
+			[&"d_bat", &"cave_bat", &"evade"],
+		],
+		SampleData.NOBLE: [
+			[&"nb_pattern", &"geo_pattern", &"explore"],
+			[&"nb_light", &"tablet_light", &"explore"],
+			[&"nb_statue", &"statue_trap", &"explore"],
+			[&"nb_star", &"keyhole_shape", &"explore"],
+		],
+	}
+	for adventurer_id in plans:
+		_reset_session()
+		GameSession.adventurer_id = adventurer_id
+		var screen: MatchingScreen = load("res://scenes/matching_screen.tscn").instantiate()
+		root.add_child(screen)
+		await _frames(3)
+		_check(screen._name_label.text.contains(SampleData.adventurer(adventurer_id).display_name), "flow %s: the header shows the adventurer" % adventurer_id)
+		var steps: Array = plans[adventurer_id]
+		for n in steps.size():
+			if n > 0:
+				screen._start_next_event()
+				await _frames(3)
+			screen._reveal_all()
+			await _frames(2)
+			_check(screen._sketch_frame != null, "flow %s: event %d has a sketch" % [adventurer_id, n + 1])
+			var step: Array = steps[n]
+			screen._on_keyword_dropped(step[0], step[1])
+			_check(screen.state.matched, "flow %s: event %d is matched" % [adventurer_id, n + 1])
+			screen._on_stat_chosen(step[2])
+			await create_timer(1.0).timeout
+		_check(screen.state.results.size() == 4, "flow %s: four events resolved" % adventurer_id)
+		screen._start_next_event()
+		await _frames(2)
+		_check(screen._phase == MatchingScreen.Phase.SUMMARY, "flow %s: summary at the end" % adventurer_id)
+		screen.queue_free()
+		await _frames(2)
+	# 医師の画面では、パニックの倍率が反映される
+	_reset_session()
+	GameSession.adventurer_id = SampleData.DOCTOR
+	var doctor_screen: MatchingScreen = load("res://scenes/matching_screen.tscn").instantiate()
+	root.add_child(doctor_screen)
+	await _frames(3)
+	_check(is_equal_approx(doctor_screen.state.penalty_scale, 1.5), "flow doctor: the panic factor reaches the match state (%.2f)" % doctor_screen.state.penalty_scale)
+	_check(is_equal_approx(doctor_screen.state.event_time_limit, 15.0), "flow doctor: the time limit is short (%.1f)" % doctor_screen.state.event_time_limit)
+	doctor_screen.queue_free()
+	await _frames(2)
+	_reset_session()
+
+
 ## ノートの引き継ぎ
 func _test_carry_over() -> void:
 	_reset_session()
@@ -516,7 +611,7 @@ func _test_carry_over() -> void:
 	_check(second.current.id == &"m2_beast" and second.auto_matched and second.auto_target == &"beast_aversion", "carry: the mercenary's beast event starts pre-matched")
 	_check(second.drop(&"torch", &"beast_aversion") == MatchingState.DropResult.IGNORED, "carry: no double matching")
 	_check(second.learned.is_empty(), "carry: nothing new is learned the second time")
-	_check(SampleData.growth_spots().size() == 6, "carry: the note has six spots that can grow (%d)" % SampleData.growth_spots().size())
+	_check(SampleData.growth_spots().size() == 8, "carry: the note has eight spots that can grow (%d)" % SampleData.growth_spots().size())
 	# 引数を省略した状態は、互いに共有されない
 	var a := MatchingState.new(SampleData.adventurer(), SampleData.events(), SampleData.entries())
 	var b := MatchingState.new(SampleData.adventurer(), SampleData.events(), SampleData.entries())
@@ -571,16 +666,16 @@ func _test_carry_over_ui() -> void:
 	var start: PrepScreen = load("res://scenes/prep_screen.tscn").instantiate()
 	root.add_child(start)
 	await _frames(3)
-	_check(start.notebook_label.text.contains("0 / 6"), "carry ui: the prep screen shows no growth at first (%s)" % start.notebook_label.text)
+	_check(start.notebook_label.text.contains("0 / 8"), "carry ui: the prep screen shows no growth at first (%s)" % start.notebook_label.text)
 	GameSession.filled_blanks[&"beast_aversion"] = true
 	GameSession.funds = 50
 	start._refresh()
-	_check(start.notebook_label.text.contains("1 / 6") and start.notebook_label.text.contains("火"), "carry ui: the prep screen shows what has been written (%s)" % start.notebook_label.text)
+	_check(start.notebook_label.text.contains("1 / 8") and start.notebook_label.text.contains("火"), "carry ui: the prep screen shows what has been written (%s)" % start.notebook_label.text)
 	_check(start.warning_label.text.contains("生活費"), "carry ui: low funds trigger a warning")
 	start.request_reset()
 	_check(GameSession.filled_blanks.has(&"beast_aversion") and GameSession.funds == 50, "carry ui: the first press only asks for confirmation")
 	start.request_reset()
-	_check(GameSession.filled_blanks.is_empty() and GameSession.funds == Rules.START_FUNDS and start.notebook_label.text.contains("0 / 6"), "carry ui: the second press resets everything")
+	_check(GameSession.filled_blanks.is_empty() and GameSession.funds == Rules.START_FUNDS and start.notebook_label.text.contains("0 / 8"), "carry ui: the second press resets everything")
 	start.queue_free()
 	await _frames(2)
 	_reset_session()
@@ -592,14 +687,18 @@ func _test_illustrations() -> void:
 	var paths := Illustrations.candidate_paths("sketches", &"beast", &"mercenary")
 	_check(paths[0].ends_with("/sketches/mercenary/beast.png") and paths[4].ends_with("/sketches/beast.png"), "art: the adventurer's own drawing is searched first")
 	_check(paths[0].ends_with(".png") and paths[3].ends_with(".svg"), "art: png is preferred over svg (%s)" % paths[3])
-	for id in [&"mushroom", &"beast", &"statue", &"moss", &"pit", &"pit_deep", &"bat", &"pattern", &"tablet"]:
+	for id in [&"mushroom", &"beast", &"statue", &"moss", &"pit", &"pit_deep", &"bat", &"pattern", &"tablet", &"herb", &"keyhole"]:
 		_check(Illustrations.find("sketches", id) != null, "art: sketch %s is available" % id)
-	for id in [SampleData.CHILDHOOD, SampleData.MERCENARY]:
+	for id in [SampleData.CHILDHOOD, SampleData.MERCENARY, SampleData.DOCTOR, SampleData.NOBLE]:
 		_check(Illustrations.find("portraits", id) != null, "art: portrait %s is available" % id)
+	# 冒険者ごとの絵柄: 専用の絵があれば、共通の絵と別のものが返る
+	_check(Illustrations.find("sketches", &"bat", SampleData.NOBLE) == Illustrations.find("sketches", &"bat"), "art: an adventurer without their own bat drawing uses the shared one")
+	_check(Illustrations.find("sketches", &"bat", SampleData.DOCTOR) != Illustrations.find("sketches", &"bat"), "art: the doctor draws the bat in his own style")
+	_check(Illustrations.find("sketches", &"pattern", SampleData.NOBLE) != Illustrations.find("sketches", &"pattern"), "art: the noble draws the pattern in his own style")
 	_check(Illustrations.find("sketches", &"no_such_drawing") == null, "art: a missing drawing is just null")
 	_check(Illustrations.find("sketches", &"") == null, "art: an empty id is null")
 	# どのイベントのスケッチも、絵のファイルがある
-	for adventurer_id in [SampleData.CHILDHOOD, SampleData.MERCENARY]:
+	for adventurer_id in [SampleData.CHILDHOOD, SampleData.MERCENARY, SampleData.DOCTOR, SampleData.NOBLE]:
 		for ev in SampleData.events(adventurer_id):
 			_check(ev.sketch != &"" and Illustrations.find("sketches", ev.sketch, adventurer_id) != null, "art: event %s has its sketch" % ev.id)
 
@@ -637,7 +736,7 @@ func _test_illustrations_ui() -> void:
 	for card: PanelContainer in prep.cards.values():
 		for node in card.find_children("*", "TextureRect", true, false):
 			faces += 1
-	_check(faces == 2, "art ui: both adventurer cards show a face (%d)" % faces)
+	_check(faces == 4, "art ui: every adventurer card shows a face (%d)" % faces)
 	prep.queue_free()
 	await _frames(2)
 	_reset_session()

@@ -4,6 +4,8 @@ extends RefCounted
 
 const CHILDHOOD := &"childhood"
 const MERCENARY := &"mercenary"
+const DOCTOR := &"doctor"
+const NOBLE := &"noble"
 
 
 ## 選択画面に並べる冒険者
@@ -11,6 +13,8 @@ static func adventurers() -> Array[Adventurer]:
 	var list: Array[Adventurer] = []
 	list.append(adventurer(CHILDHOOD))
 	list.append(adventurer(MERCENARY))
+	list.append(adventurer(DOCTOR))
+	list.append(adventurer(NOBLE))
 	return list
 
 
@@ -23,6 +27,19 @@ static func adventurer(id: StringName = CHILDHOOD) -> Adventurer:
 		a.report_style = "短く事務的。「割に合うか」で判断する。報告は正確だが、遺物や仕掛けの手がかりは「金にならん」と流しがち。"
 		a.chars_per_sec = 32.0
 		a.stats = {&"battle": 5, &"explore": 2, &"evade": 3}
+	elif id == DOCTOR:
+		a.display_name = "医師"
+		a.tagline = "未知の薬草を求めて潜る、訳ありの医師"
+		a.report_style = "体の変化や、動植物の生態にやたら詳しい。ただしパニックになりやすく、早口。間違えたときの時間のロスが大きい。"
+		a.chars_per_sec = 36.0
+		a.panic_factor = 1.5
+		a.stats = {&"battle": 1, &"explore": 4, &"evade": 3}
+	elif id == NOBLE:
+		a.display_name = "没落貴族"
+		a.tagline = "古代文明の真理を追う、遺物狂いの没落貴族"
+		a.report_style = "知識は豊富だが、話が長くて専門用語だらけ。ハイライトされた語の大半は、本筋と関係のない蘊蓄。必要な手がかりは、長話に埋もれている。"
+		a.chars_per_sec = 42.0
+		a.stats = {&"battle": 1, &"explore": 5, &"evade": 1}
 	else:
 		a.display_name = "幼なじみ"
 		a.tagline = "あなたに元気になってほしい、姉を一緒に探してくれる冒険者"
@@ -55,8 +72,14 @@ static func entries() -> Array[NoteEntry]:
 		{&"pit_sign": "色", &"pit_depth": "底が見えないほど深い"}, 0)
 	pit.fix_olds = {&"pit_depth": "浅い"}
 	list.append(pit)
+	list.append(_entry(&"herb_moon", &"plants", "月影草",
+		"銀色の葉脈を持つ草。{blank:herb_effect}作用があるらしい。摘むときは、まわりをよく調べて、根を傷めないように採ること。",
+		{&"herb_effect": "心を落ち着ける"}, 0))
 	list.append(_entry(&"geo_pattern", &"relics", "壁や床の幾何学模様",
 		"壁と床に同じ幾何学模様があるのは、仕掛けの合図。模様をたどってよく調べると、隠された扉が見つかる。", {}, 0))
+	list.append(_entry(&"stone_door", &"relics", "石の扉の鍵穴",
+		"古代の石の扉には、{blank:keyhole_shape}の鍵穴がある。合う形の鍵を探して、まわりをよく調べること。",
+		{&"keyhole_shape": "星形"}, 0))
 	list.append(_entry(&"old_tablet", &"relics", "古い石板",
 		"文字が刻まれた石板は、古代の記録。{blank:tablet_light}を近づけると文字が浮かぶ。浮かんだ文字を調べれば、隠し部屋の場所が分かることがある。持ち帰れば高く売れるが、とても重い。",
 		{&"tablet_light": "灯り"}, 0))
@@ -82,6 +105,8 @@ static func info_offers() -> Array[ShopItem]:
 	list.append(_offer(&"pit_depth", "落とし穴の深さ", "「浅い」という話は本当か。落ちたことのある人に聞く。", 90))
 	list.append(_offer(&"bat_weak", "コウモリの弱点", "群れで天井に張りつく蝙蝠の、追い払い方。", 70))
 	list.append(_offer(&"tablet_light", "石板の読み方", "古い石板の文字を浮かばせる方法を、遺物商が知っている。", 110))
+	list.append(_offer(&"herb_effect", "月影草の効き目", "銀色の葉脈の草の効き目を、薬師が知っている。", 80))
+	list.append(_offer(&"keyhole_shape", "石の扉の鍵穴", "古代の扉の鍵穴の形を、遺物商が覚えている。", 100))
 	return list
 
 
@@ -119,6 +144,10 @@ static func _offer(target: StringName, title: String, description: String, price
 static func events(id: StringName = CHILDHOOD) -> Array[EventDef]:
 	if id == MERCENARY:
 		return _mercenary_events()
+	if id == DOCTOR:
+		return _doctor_events()
+	if id == NOBLE:
+		return _noble_events()
 	return _childhood_events()
 
 
@@ -207,6 +236,73 @@ static func _mercenary_events() -> Array[EventDef]:
 	return list
 
 
+## 医師のシナリオ。体の変化や生態の描写が多く、早口。パニックになりやすく、制限時間は短い。
+static func _doctor_events() -> Array[EventDef]:
+	var list: Array[EventDef] = []
+	list.append(_timed(_event(&"d1_rash",
+		"[kw:rash]傘の青い斑点のキノコ[/kw]…！ 近づいただけで、皮膚が赤く熱をもって、脈がどんどん速くなってきました…！ これは触れたらまずいです、どうすれば…！",
+		&"evade", 12, {&"rash": &"mushroom_poison"},
+		"赤く熱をもつなんて…やっぱり毒キノコだ。近づかずに避けないと！",
+		"素早く離れました！ 脈も落ち着いてきました…ふぅ。",
+		"慌てて転んでしまって…少し荷物を落としました…！"), 15.0))
+	list.append(_timed(_event(&"d2_herb",
+		"銀色の葉脈の草…！ [kw:herb]葉に触れると、速かった脈がすっと落ち着いて[/kw]いきます…これは鎮静の作用かもしれません！ 採ってもいいですか…！？",
+		&"explore", 13, {&"herb": &"herb_effect"},
+		"脈が落ち着く…心を落ち着ける作用があるんだ。ノートに書いておくね。まわりをよく調べて採って！",
+		"根を傷めないよう、よく調べて採れました！ これで救える人がいるかも…！",
+		"慌てて引き抜いたら、根がちぎれて…すみません…！"), 15.0))
+	list.append(_timed(_event(&"d3_numb",
+		"光る苔に、うっかり触れてしまって…[kw:numb_d]指先の感覚が鈍って、脈も不規則に[/kw]なっています…！ ノートには触っても無害とあったはず…これは神経に作用する毒です…！",
+		&"evade", 12, {&"numb_d": &"moss_safe"},
+		"指がしびれて脈も乱れるなんて…ノートが間違ってた。「触るとしびれる」に直すね。離れて！",
+		"息を止めて離れたら、しびれも引いてきました…！",
+		"動揺して、苔の上を歩き回ってしまいました…荷物を落として…！"), 15.0))
+	list.append(_timed(_event(&"d4_bats_high",
+		"天井から、耳に刺さるような高い声が…！ [kw:d_bat]天井の蝙蝠の群れ[/kw]です、動悸が止まらなくて…！ 刺激しないほうがいいですよね…！？",
+		&"evade", 12, {&"d_bat": &"cave_bat"},
+		"刺激せず静かに離れるのがいちばん、ってノートに書いてある。静かに離れて！",
+		"音を立てずに離れました…心臓が飛び出しそうでしたが…！",
+		"悲鳴を上げてしまって…群れが騒ぎ出して、荷物が少し…！"), 15.0))
+	return list
+
+
+## 没落貴族のシナリオ。報告が長く、ハイライトされた語の大半は本筋と関係のない蘊蓄（おとり）。
+## 正解のキーワードは1つだけ。間違った語を運ぶと、時間を失う。
+static func _noble_events() -> Array[EventDef]:
+	var list: Array[EventDef] = []
+	list.append(_timed(_event(&"n1_pattern",
+		"おお！ この壁の幾何学模様は第三紀の様式…いや待て、[kw:nb_pigment]壁面に塗られた朱の顔料[/kw]は鉱物由来で、おそらく辰砂だな。それにしても[kw:nb_beam]天井の梁の組み方[/kw]は実に見事で…むむ、[kw:nb_pattern]壁と同じ模様が、床の石にも連なっている[/kw]ぞ！ これは何かの合図に違いない。どう思う？",
+		&"explore", 13, {&"nb_pattern": &"geo_pattern"},
+		"壁と床に同じ模様…仕掛けの合図だって、ノートに書いてある。調べて！",
+		"模様をたどると、壁に隠し扉が…！ 素晴らしい、実に素晴らしい！",
+		"ううむ、何も見つからぬ…私の見立てが誤りだったか…。"), 30.0))
+	list.append(_timed(_event(&"n2_tablet",
+		"なんと、古代の石板だ！ [kw:nb_weather]表面の風化の具合[/kw]から察するに、数千年は経っておるな。刻まれた文字は第一紀のもので…ふむ、[kw:nb_light]灯りを近づけると、刻まれた文字がうっすらと浮かび上がる[/kw]ではないか！ だが肝心の[kw:nb_text]文字の意味[/kw]は、私にも分からぬ…どうすれば？",
+		&"explore", 14, {&"nb_light": &"tablet_light"},
+		"灯りで文字が浮かぶ…ノートに書いておくね。浮かんだ文字を調べて！",
+		"浮かんだ文字を写した。隠し部屋の場所が記されておる！ 実に愉快だ！",
+		"文字は読み取れなんだ…無念だ。"), 30.0))
+	list.append(_timed(_event(&"n3_statue",
+		"ふむ、目の光る石像か。[kw:nb_style]この像の様式は第二紀後期[/kw]で、[kw:nb_robe]衣の襞の彫り[/kw]が…いや、そんなことよりだ。[kw:nb_statue]台座の付いた、目が光る石像[/kw]、これは見るからに仕掛けだな。壊して通るのは野蛮だと思うが…どうしたものか。",
+		&"explore", 13, {&"nb_statue": &"statue_trap"},
+		"壊すと作動する、ってノートに書いてある。台座を調べて！",
+		"台座の裏にスイッチを発見した！ 実に優雅な解決だ。",
+		"石像が動き出した…！ 逃げるぞ…荷物が落ちたが…！"), 30.0))
+	list.append(_timed(_event(&"n4_keyhole",
+		"見よ、巨大な石の扉だ！ [kw:nb_carve]扉の彫刻の見事さ[/kw]は、[kw:nb_king]古代の王の権威[/kw]を示すもので…おっと、それよりも、[kw:nb_star]扉の中央にある、五つの角をもつ星の形のくぼみ[/kw]を見たまえ。これが鍵穴に違いない！ 合う鍵を探さねば…どうすればよい？",
+		&"explore", 13, {&"nb_star": &"keyhole_shape"},
+		"五つの角をもつ星の形の鍵穴…ノートに書いておくね。まわりを調べて、合う鍵を探して！",
+		"壁の隅に、星形の鍵が埋まっていた！ 見事だ！",
+		"鍵は見つからなかった…時間ばかりが過ぎたな。"), 30.0))
+	return list
+
+
+## イベントの制限時間を変える
+static func _timed(ev: EventDef, seconds: float) -> EventDef:
+	ev.time_limit = seconds
+	return ev
+
+
 static func _merc_event(id: StringName, report: String, stat: StringName, base: int,
 		targets: Dictionary, correct_line: String, success: String, fail: String) -> EventDef:
 	var ev := _event(id, report, stat, base, targets, correct_line, success, fail)
@@ -256,6 +352,8 @@ const SKETCHES := {
 	&"e5_moss": &"moss", &"e6_pit_sign": &"pit", &"e7_pit_depth": &"pit_deep",
 	&"m1_bats": &"bat", &"m2_beast": &"beast", &"m3_pattern": &"pattern", &"m4_statue": &"statue",
 	&"m5_bats_again": &"bat", &"m6_tablet": &"tablet",
+	&"d1_rash": &"mushroom", &"d2_herb": &"herb", &"d3_numb": &"moss", &"d4_bats_high": &"bat",
+	&"n1_pattern": &"pattern", &"n2_tablet": &"tablet", &"n3_statue": &"statue", &"n4_keyhole": &"keyhole",
 }
 
 

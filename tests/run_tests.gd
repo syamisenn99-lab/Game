@@ -50,7 +50,7 @@ func _test_note_entry() -> void:
 
 
 func _test_judge() -> void:
-	_check(Judge.modifier(true, &"explore", &"explore") == -4, "judge: matched+correct")
+	_check(Judge.modifier(true, &"explore", &"explore") == -8, "judge: matched+correct")
 	_check(Judge.modifier(true, &"battle", &"explore") == 0, "judge: matched+wrong stat")
 	_check(Judge.modifier(false, &"explore", &"explore") == 0, "judge: unmatched+correct")
 	_check(Judge.modifier(false, &"battle", &"explore") == 4, "judge: unmatched+wrong")

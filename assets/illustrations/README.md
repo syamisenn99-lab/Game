@@ -10,8 +10,8 @@
 |---|---|---|---|
 | `sketches/` | 冒険者のスケッチ（通信ログに、文字送りが終わると出る） | 横400 × 縦300（4:3） | 下の表の「絵の名前」 |
 | `sketches/<冒険者id>/` | その冒険者だけが描く版（あれば優先される） | 同上 | 同じ名前 |
-| `portraits/` | キャラの顔（準備画面、探索画面のヘッダー） | 256 × 256 | `childhood`、`mercenary`、`doctor`、`noble` |
-| `backgrounds/` | 背景（まだ使われていない） | 1280 × 720 | — |
+| `portraits/` | キャラの顔（準備画面、探索画面のヘッダー） | 256 × 256 | `childhood`、`mercenary`、`doctor`、`noble`、`sister`（姉。ノベル場面で使う） |
+| `backgrounds/` | ノベル場面の背景（あれば表示される） | 1280 × 720 | 場面の名前（下の表） |
 
 - 冒険者id: 幼なじみ = `childhood`、傭兵 = `mercenary`、医師 = `doctor`、没落貴族 = `noble`
 - 形式は **PNG**（背景は透明）が基本。`.webp` `.jpg` `.svg` も読める。同じ名前があれば、`png → webp → jpg → svg` の順に使う。
@@ -40,3 +40,12 @@
 
 ## 権利について
 自分で描いた絵のほか、画像生成ツールなどの出力を使うときは、**商用利用の可否**をツールの規約で確認すること。
+
+## ノベル場面の背景
+`backgrounds/<場面id>.png` を置くと、その場面の背景に出る（文章枠の後ろ）。場面idは次のとおり。
+
+| 場面id | 場面 |
+|---|---|
+| `prologue` | プロローグ |
+| `intro_childhood` `intro_mercenary` `intro_doctor` `intro_noble` | 冒険者の紹介 |
+| `clue_1` 〜 `clue_5` | 姉の手がかり |

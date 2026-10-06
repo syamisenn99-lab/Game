@@ -22,6 +22,9 @@ func _reset_session() -> void:
 	# テストではファイルを読み書きせず、ノートは毎回まっさらにする
 	GameSession.persist = false
 	GameSession._loaded = true
+	# テストでは、場面を出さず、シーンも切り替えない（場面のテストでは、個別に有効にする）
+	GameSession.story_enabled = false
+	GameSession.navigate = false
 	GameSession.reset_all()
 	GameSession.adventurer_id = SampleData.CHILDHOOD
 
@@ -42,6 +45,10 @@ func _run() -> void:
 	await _test_mercenary_flow()
 	_test_new_adventurers_data()
 	await _test_doctor_and_noble_flow()
+	_test_story_data()
+	_test_story_director()
+	await _test_story_screen()
+	await _test_story_in_prep()
 	_test_carry_over()
 	await _test_carry_over_ui()
 	_test_illustrations()
@@ -599,6 +606,211 @@ func _test_doctor_and_noble_flow() -> void:
 	_check(is_equal_approx(doctor_screen.state.penalty_scale, 1.5), "flow doctor: the panic factor reaches the match state (%.2f)" % doctor_screen.state.penalty_scale)
 	_check(is_equal_approx(doctor_screen.state.event_time_limit, 15.0), "flow doctor: the time limit is short (%.1f)" % doctor_screen.state.event_time_limit)
 	doctor_screen.queue_free()
+	await _frames(2)
+	_reset_session()
+
+
+## 場面のデータ（形が揃っていて、使う絵があり、条件が正しい）
+func _test_story_data() -> void:
+	var scenes := StoryData.all()
+	var ids := {}
+	var adventurer_ids := [SampleData.CHILDHOOD, SampleData.MERCENARY, SampleData.DOCTOR, SampleData.NOBLE]
+	for scene in scenes:
+		_check(not ids.has(scene.id), "story data: %s has a unique id" % scene.id)
+		ids[scene.id] = true
+		_check(scene.title != "" and scene.lines.size() >= 3, "story data: %s has a title and lines (%d)" % [scene.id, scene.lines.size()])
+		for line in scene.lines:
+			_check(String(line["text"]) != "", "story data: %s has no empty line" % scene.id)
+			var key: StringName = line["portrait"]
+			if key != &"":
+				_check(String(line["speaker"]) != "" and Illustrations.find("portraits", key) != null, "story data: %s portrait %s exists" % [scene.id, key])
+		for adventurer_id in scene.after_runs:
+			_check(adventurer_ids.has(StringName(adventurer_id)), "story data: %s refers to a real adventurer" % scene.id)
+		for required in scene.requires_seen:
+			_check(ids.has(required) or StoryData.find(required) != null, "story data: %s requires an existing scene" % scene.id)
+		if scene.trigger == &"depart":
+			_check(adventurer_ids.has(scene.adventurer), "story data: %s introduces a real adventurer" % scene.id)
+	_check(StoryData.find(&"prologue") != null and StoryData.find(&"no_such_scene") == null, "story data: find works")
+	_check(StoryData.clues().size() == 5, "story data: five clues about the sister (%d)" % StoryData.clues().size())
+	for scene in StoryData.clues():
+		_check(scene.clue_title != "" and scene.clue_summary != "", "story data: clue %s has a heading and a summary" % scene.id)
+	var intros := scenes.filter(func(s: StoryScene) -> bool: return s.trigger == &"depart").map(func(s: StoryScene) -> StringName: return s.adventurer)
+	_check(intros.size() == 4 and adventurer_ids.all(func(a: StringName) -> bool: return intros.has(a)), "story data: every adventurer has an intro scene")
+	# 世界観の説明が、プロローグに入っている（通信ログの「声だけが届く」の見出しをやめた代わり）
+	var prologue_text := "".join(StoryData.find(&"prologue").lines.map(func(l: Dictionary) -> String: return l["text"]))
+	_check(prologue_text.contains("声だけ") and prologue_text.contains("耳飾り") and prologue_text.contains("ノート"), "story data: the prologue explains the voice-only earring and the notebook")
+
+
+## いつ、どの場面が出るか
+func _test_story_director() -> void:
+	_reset_session()
+	GameSession.story_enabled = true
+	_check(StoryDirector.next_for_prep().id == &"prologue", "director: the prologue comes first")
+	_check(StoryDirector.intro_for_depart(SampleData.CHILDHOOD) == null, "director: no intro before the prologue")
+	GameSession.mark_seen(&"prologue")
+	_check(StoryDirector.next_for_prep() == null, "director: nothing else is due right after the prologue")
+	for adventurer_id in [SampleData.CHILDHOOD, SampleData.MERCENARY, SampleData.DOCTOR, SampleData.NOBLE]:
+		var intro := StoryDirector.intro_for_depart(adventurer_id)
+		_check(intro != null and intro.adventurer == adventurer_id, "director: %s has an intro" % adventurer_id)
+		GameSession.mark_seen(intro.id)
+		_check(StoryDirector.intro_for_depart(adventurer_id) == null, "director: the intro of %s plays only once" % adventurer_id)
+	# 探索を終えるたびに、その冒険者の手がかりが出る
+	var expected := {
+		SampleData.CHILDHOOD: &"clue_1", SampleData.NOBLE: &"clue_2",
+		SampleData.DOCTOR: &"clue_3", SampleData.MERCENARY: &"clue_4",
+	}
+	for adventurer_id in expected:
+		GameSession.adventurer_id = adventurer_id
+		_check(StoryDirector.next_for_prep() == null or StoryDirector.next_for_prep().id != expected[adventurer_id], "director: %s's clue is not due before a run" % adventurer_id)
+		GameSession.settle(100)
+		_check(GameSession.runs_of(adventurer_id) == 1, "director: a settlement counts the run of %s" % adventurer_id)
+		var due := StoryDirector.next_for_prep()
+		_check(due != null and due.id == expected[adventurer_id], "director: after a run with %s, %s is due" % [adventurer_id, expected[adventurer_id]])
+		GameSession.mark_seen(due.id)
+	# 4つの手がかりが揃うと、最後の手がかりが出て、そのあとは何も出ない
+	var last := StoryDirector.next_for_prep()
+	_check(last != null and last.id == &"clue_5", "director: the last clue appears once the four are found")
+	GameSession.mark_seen(&"clue_5")
+	_check(StoryDirector.next_for_prep() == null, "director: nothing is left to tell")
+
+	# 保存と読み込み（見た場面と、探索を終えた回数）
+	var temp_path := "user://test_story_save.json"
+	GameSession.persist = true
+	GameSession.save_path = temp_path
+	GameSession.save_notebook()
+	GameSession.seen_scenes = {}
+	GameSession.runs = {}
+	GameSession._loaded = false
+	GameSession.load_notebook()
+	_check(GameSession.has_seen(&"clue_5") and GameSession.runs_of(SampleData.MERCENARY) == 1, "director: seen scenes and run counts are saved and loaded")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(temp_path))
+	GameSession.save_path = "user://notebook.json"
+	GameSession.reset_all()
+	_check(not GameSession.has_seen(&"prologue") and GameSession.runs_of(SampleData.CHILDHOOD) == 0, "director: reset_all also forgets the story")
+	_reset_session()
+
+
+## ノベル画面
+func _test_story_screen() -> void:
+	_reset_session()
+	GameSession.story_scene = &"prologue"
+	var screen: StoryScreen = load("res://scenes/story_screen.tscn").instantiate()
+	screen.navigate = false
+	root.add_child(screen)
+	await _frames(3)
+	var scene := StoryData.find(&"prologue")
+	_check(screen.index == 0 and screen._text_label.text == scene.lines[0]["text"], "story ui: the first line is shown")
+	_check(not screen._name_label.visible and not screen._portrait.visible, "story ui: narration has no name or face")
+	# 文字送り中に押すと、まず最後まで表示される
+	_check(screen._typing, "story ui: the line is being typed")
+	screen.advance()
+	_check(not screen._typing and screen.index == 0, "story ui: the first press completes the line")
+	screen.advance()
+	_check(screen.index == 1, "story ui: the second press moves on")
+	# 姉のセリフ（顔つき）まで進める
+	var sister_index := -1
+	for i in scene.lines.size():
+		if scene.lines[i]["speaker"] == "姉":
+			sister_index = i
+			break
+	while screen.index < sister_index:
+		screen.advance()
+		screen.advance()
+	_check(screen._name_label.visible and screen._name_label.text == "姉" and screen._portrait.visible, "story ui: a character's line shows the name and the face")
+	_check(screen._text_label.text.begins_with("「") and screen._text_label.text.ends_with("」"), "story ui: speech is quoted (%s)" % screen._text_label.text)
+	# 最後まで読むと、見た場面になる
+	var finished_flag := [false]
+	screen.finished.connect(func() -> void: finished_flag[0] = true)
+	var guard := 0
+	while not screen.done and guard < 100:
+		screen.advance()
+		guard += 1
+	_check(screen.done and finished_flag[0] and GameSession.has_seen(&"prologue"), "story ui: reading to the end marks the scene as seen")
+	screen.queue_free()
+	await _frames(2)
+
+	# スキップ
+	GameSession.story_scene = &"intro_noble"
+	var skipped: StoryScreen = load("res://scenes/story_screen.tscn").instantiate()
+	skipped.navigate = false
+	root.add_child(skipped)
+	await _frames(3)
+	skipped._on_skip()
+	_check(skipped.done and GameSession.has_seen(&"intro_noble"), "story ui: skipping also marks the scene as seen")
+	skipped.queue_free()
+	await _frames(2)
+	# 存在しない場面でも、壊れずに終わる
+	GameSession.story_scene = &"no_such_scene"
+	var missing: StoryScreen = load("res://scenes/story_screen.tscn").instantiate()
+	missing.navigate = false
+	root.add_child(missing)
+	await _frames(3)
+	_check(missing.done, "story ui: an unknown scene just ends")
+	missing.queue_free()
+	await _frames(2)
+	_reset_session()
+
+
+## 準備画面との連携（初回のプロローグ、出発時の紹介、手がかり帳）
+func _test_story_in_prep() -> void:
+	_reset_session()
+	GameSession.story_enabled = true
+	GameSession.last_destination = ""
+	# 初回は、プロローグが先に出る
+	var first: PrepScreen = load("res://scenes/prep_screen.tscn").instantiate()
+	root.add_child(first)
+	await _frames(4)
+	_check(GameSession.last_destination == StoryDirector.STORY_SCENE and GameSession.story_scene == &"prologue", "prep story: the prologue plays on the first launch")
+	_check(GameSession.story_next == PrepScreen.PREP_SCENE, "prep story: it returns to the prep screen afterwards")
+	first.queue_free()
+	await _frames(2)
+
+	# プロローグのあと: 普通に準備画面が出る。出発すると、初めての冒険者の紹介が先に出る
+	GameSession.mark_seen(&"prologue")
+	GameSession.last_destination = ""
+	var prep: PrepScreen = load("res://scenes/prep_screen.tscn").instantiate()
+	root.add_child(prep)
+	await _frames(4)
+	_check(GameSession.last_destination == "" and prep.clue_button != null, "prep story: the prep screen opens normally after the prologue")
+	_check(prep.clue_button.text == "姉の手がかり 0/5", "prep story: the clue button shows the progress (%s)" % prep.clue_button.text)
+	prep.depart()
+	_check(GameSession.last_destination == StoryDirector.STORY_SCENE and GameSession.story_scene == &"intro_childhood" and GameSession.story_next == PrepScreen.MATCHING_SCENE, "prep story: the first departure plays the intro, then goes to the expedition")
+	GameSession.mark_seen(&"intro_childhood")
+	prep.depart()
+	_check(GameSession.last_destination == PrepScreen.MATCHING_SCENE, "prep story: later departures go straight to the expedition")
+
+	# 手がかり帳
+	prep.open_clue_book()
+	await _frames(2)
+	_check(prep.clue_book != null, "prep story: the clue book opens")
+	var rows := prep.clue_book.find_children("*", "Button", true, false).filter(func(b: Button) -> bool: return b.text == "読み返す")
+	_check(rows.size() == 1, "prep story: only the prologue can be reread at first (%d)" % rows.size())
+	var texts := prep.clue_book.find_children("*", "Label", true, false).map(func(l: Label) -> String: return l.text)
+	_check(texts.any(func(s: String) -> bool: return s.contains("？？？")), "prep story: undiscovered clues are hidden")
+	prep.close_clue_book()
+	await _frames(2)
+	_check(prep.clue_book == null, "prep story: the clue book closes")
+	# 手がかりを見つけると、読み返せる
+	GameSession.mark_seen(&"clue_1")
+	prep._refresh()
+	prep.open_clue_book()
+	await _frames(2)
+	var rows2 := prep.clue_book.find_children("*", "Button", true, false).filter(func(b: Button) -> bool: return b.text == "読み返す")
+	var texts2 := prep.clue_book.find_children("*", "Label", true, false).map(func(l: Label) -> String: return l.text)
+	_check(rows2.size() == 2 and texts2.any(func(s: String) -> bool: return s.contains("姉は、あなたの体質を調べていた")), "prep story: a found clue is shown and can be reread")
+	_check(prep.clue_button.text == "姉の手がかり 1/5", "prep story: the progress follows (%s)" % prep.clue_button.text)
+	prep.replay_scene(&"clue_1")
+	_check(GameSession.story_scene == &"clue_1" and GameSession.story_next == PrepScreen.PREP_SCENE, "prep story: rereading plays the scene and comes back")
+	prep.close_clue_book()
+	await _frames(2)
+
+	# 最初からやり直すと、プロローグがまた出る
+	GameSession.last_destination = ""
+	prep.request_reset()
+	prep.request_reset()
+	await _frames(3)
+	_check(GameSession.last_destination == StoryDirector.STORY_SCENE and GameSession.story_scene == &"prologue", "prep story: starting over plays the prologue again")
+	prep.queue_free()
 	await _frames(2)
 	_reset_session()
 

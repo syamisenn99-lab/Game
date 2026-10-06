@@ -338,6 +338,21 @@ def portrait_noble(style="childhood"):
     return p
 
 
+def portrait_sister(style="childhood"):
+    p = Pen(17, 256, 256, style)
+    p.shape([(176, 70), (222, 120), (214, 190), (190, 150)], "#5a3a2a")                   # しっぽのポニーテール
+    p.blob(128, 132, 70, 84, "#ffdcc0", 14, 3)                                             # かお
+    p.shape([(54, 112), (66, 56), (128, 34), (190, 56), (202, 112), (170, 86), (128, 74), (88, 88)], "#5a3a2a")  # かみ
+    p.shape([(52, 100), (204, 100), (204, 116), (52, 116)], "#c0392b", amp=2)             # 赤いはちまき
+    for x in (100, 156):                                                                    # やさしい目
+        p.polyline([(x - 12, 138), (x, 130), (x + 12, 138)], 4)
+    p.line((96, 124), (118, 120), 3); p.line((160, 120), (138, 124), 3)                    # まゆ
+    p.polyline([(108, 170), (128, 184), (148, 170)], 4, "#c0392b")                         # えがお
+    p.blob(76, 160, 12, 7, "#ffb3a6", 8, 1, 1, None); p.blob(180, 160, 12, 7, "#ffb3a6", 8, 1, 1, None)
+    p.shape([(60, 238), (100, 222), (156, 222), (196, 238), (190, 256), (66, 256)], "#3f8d4a")  # 冒険者のマント
+    return p
+
+
 SKETCHES = {
     "mushroom": mushroom, "beast": beast, "statue": statue, "moss": moss, "pit": pit,
     "pit_deep": pit_deep, "bat": bat, "pattern": pattern, "tablet": tablet,
@@ -345,7 +360,7 @@ SKETCHES = {
 }
 PORTRAITS = {
     "childhood": portrait_childhood, "mercenary": portrait_mercenary,
-    "doctor": portrait_doctor, "noble": portrait_noble,
+    "doctor": portrait_doctor, "noble": portrait_noble, "sister": portrait_sister,
 }
 # 冒険者ごとの絵柄で描き直す絵（その冒険者のイベントで使うものだけ）
 VARIANTS = {

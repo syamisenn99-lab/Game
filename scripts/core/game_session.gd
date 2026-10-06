@@ -13,6 +13,18 @@ static var funds: int = Rules.START_FUNDS
 static var day: int = 1
 ## 買った道具の id -> true
 static var owned_items: Dictionary = {}
+## 見た場面の id -> true（プロローグ、冒険者の紹介、姉の手がかり）
+static var seen_scenes: Dictionary = {}
+## 冒険者id -> その冒険者と探索を終えた回数
+static var runs: Dictionary = {}
+## 再生する場面と、終わったあとに進むシーン
+static var story_scene: StringName = &""
+static var story_next := "res://scenes/prep_screen.tscn"
+## false にすると、場面を出さない・シーンを切り替えない（テスト用）
+static var story_enabled := true
+static var navigate := true
+## navigate が false のとき、行き先だけを記録する（テスト用）
+static var last_destination := ""
 ## false にすると、ファイルの読み書きをしない（テスト用）
 static var persist := true
 static var save_path := "user://notebook.json"
@@ -39,6 +51,12 @@ static func load_notebook() -> void:
 	if data.get("items") is Array:
 		for id in data["items"]:
 			owned_items[StringName(str(id))] = true
+	if data.get("seen") is Array:
+		for id in data["seen"]:
+			seen_scenes[StringName(str(id))] = true
+	if data.get("runs") is Dictionary:
+		for id in data["runs"]:
+			runs[StringName(str(id))] = int(data["runs"][id])
 
 
 static func save_notebook() -> void:
@@ -50,9 +68,15 @@ static func save_notebook() -> void:
 	var items: Array[String] = []
 	for id in owned_items:
 		items.append(String(id))
+	var seen: Array[String] = []
+	for id in seen_scenes:
+		seen.append(String(id))
+	var run_counts: Dictionary = {}
+	for id in runs:
+		run_counts[String(id)] = runs[id]
 	var file := FileAccess.open(save_path, FileAccess.WRITE)
 	if file != null:
-		file.store_string(JSON.stringify({"filled": filled, "funds": funds, "day": day, "items": items}))
+		file.store_string(JSON.stringify({"filled": filled, "funds": funds, "day": day, "items": items, "seen": seen, "runs": run_counts}))
 
 
 ## ノートだけを最初の状態に戻す
@@ -66,10 +90,33 @@ static func reset_notebook() -> void:
 static func reset_all() -> void:
 	filled_blanks.clear()
 	owned_items.clear()
+	seen_scenes.clear()
+	runs.clear()
 	funds = Rules.START_FUNDS
 	day = 1
 	if persist:
 		save_notebook()
+
+
+static func has_seen(scene_id: StringName) -> bool:
+	return seen_scenes.has(scene_id)
+
+
+static func mark_seen(scene_id: StringName) -> void:
+	seen_scenes[scene_id] = true
+	save_notebook()
+
+
+## その冒険者と探索を終えた回数
+static func runs_of(adventurer_id: StringName) -> int:
+	return int(runs.get(adventurer_id, 0))
+
+
+## シーンを切り替える。navigate が false なら、行き先を記録するだけ（テスト用）
+static func go_to(tree: SceneTree, path: String) -> void:
+	last_destination = path
+	if navigate:
+		tree.change_scene_to_file(path)
 
 
 static func has_item(id: StringName) -> bool:
@@ -118,5 +165,6 @@ static func settle(reward: int) -> Dictionary:
 		"bankrupt": bankrupt,
 	}
 	day += 1
+	runs[adventurer_id] = runs_of(adventurer_id) + 1
 	save_notebook()
 	return result

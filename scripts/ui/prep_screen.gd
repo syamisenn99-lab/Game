@@ -3,6 +3,7 @@ extends Control
 ## 準備フェーズ: 誰をガイドするか選び、情報や道具を買って、探索に出発する（ゲームの入口）。
 
 const MATCHING_SCENE := "res://scenes/matching_screen.tscn"
+const PREP_SCENE := "res://scenes/prep_screen.tscn"
 const STAT_ORDER: Array[StringName] = [&"battle", &"explore", &"evade"]
 const GOLD := Color("e0a800")
 ## 能力ごとのバーの色（戦闘＝赤、探索＝青、回避＝緑）
@@ -27,6 +28,9 @@ var warning_label: Label
 var depart_button: Button
 var reset_button: Button
 var mute_button: Button
+var clue_button: Button
+## 手がかり帳（開いているときだけ）
+var clue_book: Control
 var _reset_armed := false
 var _offers: Array[ShopItem] = []
 var _items: Array[ShopItem] = []
@@ -34,6 +38,9 @@ var _items: Array[ShopItem] = []
 
 func _ready() -> void:
 	GameSession.load_notebook()
+	# 出す場面があれば（初回のプロローグ、探索のあとの手がかりなど）、先にそちらへ
+	if _maybe_play_story():
+		return
 	theme = Palette.make_theme()
 	_offers = SampleData.info_offers()
 	_items = SampleData.items()
@@ -115,6 +122,10 @@ func _build_ui() -> void:
 	warning_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	warning_label.add_theme_color_override("font_color", Color("ffb3a6"))
 	bottom.add_child(warning_label)
+	clue_button = Button.new()
+	clue_button.custom_minimum_size = Vector2(200, 48)
+	clue_button.pressed.connect(open_clue_book)
+	bottom.add_child(clue_button)
 	reset_button = Button.new()
 	reset_button.custom_minimum_size = Vector2(260, 48)
 	reset_button.pressed.connect(request_reset)
@@ -303,6 +314,11 @@ func _refresh() -> void:
 	if GameSession.funds < Rules.LIVING_COST:
 		warning_label.text = "資金が生活費（%d）より少ない。探索の報酬で足りないと、暮らしていけなくなる…" % Rules.LIVING_COST
 	reset_button.text = "本当に消す？ もう一度押すとリセット" if _reset_armed else "最初からやり直す"
+	var unlocked := 0
+	for scene in StoryData.clues():
+		if GameSession.has_seen(scene.id):
+			unlocked += 1
+	clue_button.text = "姉の手がかり %d/%d" % [unlocked, StoryData.clues().size()]
 
 
 # ---------------------------------------------------------------- 操作
@@ -327,8 +343,122 @@ func buy(item_id: StringName) -> bool:
 ## 探索に出発。テストでは go=false にしてシーン遷移を避ける。
 func depart(go: bool = true) -> void:
 	Sfx.play(&"select")
-	if go:
-		get_tree().change_scene_to_file(MATCHING_SCENE)
+	if not go:
+		return
+	# 初めてその冒険者と出発するときは、紹介の場面を先に見せる
+	var intro: StoryScene = StoryDirector.intro_for_depart(GameSession.adventurer_id) if GameSession.story_enabled else null
+	if intro != null:
+		StoryDirector.play(get_tree(), intro.id, MATCHING_SCENE)
+	else:
+		GameSession.go_to(get_tree(), MATCHING_SCENE)
+
+
+## 出す場面があれば、そちらへ移る（準備画面に戻ってくる）。移ったら true
+func _maybe_play_story() -> bool:
+	if not GameSession.story_enabled:
+		return false
+	var scene := StoryDirector.next_for_prep()
+	if scene == null:
+		return false
+	StoryDirector.play.call_deferred(get_tree(), scene.id, PREP_SCENE)
+	return true
+
+
+## 姉の手がかり帳を開く。見つけた手がかりを読み返せる
+func open_clue_book() -> void:
+	if clue_book != null:
+		return
+	Sfx.play(&"click")
+	clue_book = Control.new()
+	clue_book.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(clue_book)
+	var dim := ColorRect.new()
+	dim.color = Color(0, 0, 0, 0.65)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	clue_book.add_child(dim)
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	clue_book.add_child(center)
+	var panel := PanelContainer.new()
+	panel.custom_minimum_size = Vector2(900, 560)
+	panel.add_theme_stylebox_override("panel", Palette.box(Palette.PAPER, Palette.INK, 3, 10, 20.0))
+	center.add_child(panel)
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 8)
+	panel.add_child(vbox)
+	var title := Label.new()
+	title.text = "姉の手がかり"
+	title.add_theme_font_size_override("font_size", 30)
+	vbox.add_child(title)
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	vbox.add_child(scroll)
+	var list := VBoxContainer.new()
+	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	list.add_theme_constant_override("separation", 8)
+	scroll.add_child(list)
+	list.add_child(_clue_row("はじまりの物語", "プロローグを読み返す。", &"prologue", GameSession.has_seen(&"prologue")))
+	var number := 1
+	for scene in StoryData.clues():
+		var unlocked := GameSession.has_seen(scene.id)
+		list.add_child(_clue_row("手がかり %d　%s" % [number, scene.clue_title if unlocked else "？？？"],
+			scene.clue_summary if unlocked else _clue_hint(scene), scene.id, unlocked))
+		number += 1
+	var close := Button.new()
+	close.text = "閉じる"
+	close.custom_minimum_size = Vector2(0, 44)
+	close.pressed.connect(close_clue_book)
+	vbox.add_child(close)
+
+
+func close_clue_book() -> void:
+	if clue_book != null:
+		clue_book.queue_free()
+		clue_book = null
+		Sfx.play(&"click")
+
+
+## 解放されていない手がかりの、ヒント（どうすれば見つかるか）
+func _clue_hint(scene: StoryScene) -> String:
+	if not scene.requires_seen.is_empty():
+		return "ほかの手がかりが、すべて揃うと…"
+	for adventurer_id in scene.after_runs:
+		var adventurer := SampleData.adventurer(StringName(adventurer_id))
+		return "%sと探索を重ねると、何か話してくれるかもしれない。" % adventurer.display_name
+	return "まだ、見つかっていない。"
+
+
+func _clue_row(heading: String, body: String, scene_id: StringName, unlocked: bool) -> PanelContainer:
+	var row := PanelContainer.new()
+	row.add_theme_stylebox_override("panel", Palette.box(Palette.PAPER if unlocked else Palette.PAPER_DIM, Palette.PAPER_DIM, 2, 6, 10.0))
+	var hbox := HBoxContainer.new()
+	hbox.add_theme_constant_override("separation", 10)
+	row.add_child(hbox)
+	var text_box := VBoxContainer.new()
+	text_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hbox.add_child(text_box)
+	var head := Label.new()
+	head.text = heading
+	head.add_theme_font_size_override("font_size", 21)
+	if not unlocked:
+		head.add_theme_color_override("font_color", Palette.INK_FAINT)
+	text_box.add_child(head)
+	text_box.add_child(_small(body, Palette.INK if unlocked else Palette.INK_FAINT))
+	if unlocked:
+		var button := Button.new()
+		button.text = "読み返す"
+		button.custom_minimum_size = Vector2(120, 40)
+		button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		button.pressed.connect(replay_scene.bind(scene_id))
+		hbox.add_child(button)
+	return row
+
+
+## 見た場面を、もう一度読む（読み終わったら準備画面に戻る）
+func replay_scene(scene_id: StringName) -> void:
+	Sfx.play(&"click")
+	StoryDirector.play(get_tree(), scene_id, PREP_SCENE)
 
 
 ## 全部を最初に戻す（ノート・資金・日数・道具）。誤って消さないよう、2回押して確定する。
@@ -339,4 +469,8 @@ func request_reset() -> void:
 	else:
 		_reset_armed = false
 		GameSession.reset_all()
+		_refresh()
+		# 最初からやり直すと、プロローグがまた出る
+		_maybe_play_story()
+		return
 	_refresh()

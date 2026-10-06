@@ -109,10 +109,10 @@ func _test_state() -> void:
 	var s8 := _new_state()
 	for i in 5:
 		s8.begin_next_event()
-	_check(s8.current.id == &"e5_moss" and s8.is_fix(&"moss_edible"), "state: fifth event targets a fix spot")
+	_check(s8.current.id == &"e5_moss" and s8.is_fix(&"moss_safe"), "state: fifth event targets a fix spot")
 	_check(s8.drop(&"numb", &"glow_moss") == MatchingState.DropResult.MISMATCH, "state: the entry itself is not the fix spot")
-	_check(s8.drop(&"numb", &"moss_edible") == MatchingState.DropResult.MATCHED, "state: the fix spot accepts the keyword")
-	_check(s8.is_blank_filled(&"moss_edible"), "state: the correction is remembered")
+	_check(s8.drop(&"numb", &"moss_safe") == MatchingState.DropResult.MATCHED, "state: the fix spot accepts the keyword")
+	_check(s8.is_blank_filled(&"moss_safe"), "state: the correction is remembered")
 	var seg_note := SampleData.entries()[1]
 	var kinds := 0
 	for seg in seg_note.body_segments():
@@ -208,17 +208,17 @@ func _test_ui_flow() -> void:
 	await _frames(2)
 	_check(screen.state.current.id == &"e5_moss" and not screen.state.matched, "ui: fifth event starts unmatched")
 	var moss: NoteEntryView = screen._entry_views[&"glow_moss"]
-	var fix_slot: BlankSlot = moss.slots[&"moss_edible"]
-	_check(fix_slot.is_fix() and fix_slot._label.text == "食べられる", "ui: the note still says it is edible")
+	var fix_slot: BlankSlot = moss.slots[&"moss_safe"]
+	_check(fix_slot.is_fix() and fix_slot._label.text == "触っても無害", "ui: the note still says it is harmless")
 	_check(fix_slot.suspect, "ui: the contradicting spot is marked as suspect")
 	_check(screen._tabs.get_tab_title(0).ends_with("●"), "ui: the plants tab is marked (%s)" % screen._tabs.get_tab_title(0))
 	_check(fix_slot.size.x >= 100.0 and fix_slot.size.y >= 40.0, "ui: the fix slot is easy to hit (%s)" % fix_slot.size)
 	screen._on_keyword_dropped(&"numb", &"glow_moss")
 	_check(not screen.state.matched, "ui: dropping on the entry body is a mismatch")
-	screen._on_keyword_dropped(&"numb", &"moss_edible")
+	screen._on_keyword_dropped(&"numb", &"moss_safe")
 	await _frames(3)
 	_check(screen.state.matched and fix_slot.filled, "ui: the correction is accepted")
-	_check(fix_slot._label.text == "毒でしびれる", "ui: the note is rewritten (%s)" % fix_slot._label.text)
+	_check(fix_slot._label.text == "触るとしびれる", "ui: the note is rewritten (%s)" % fix_slot._label.text)
 	_check(moss._stamp.visible and moss._stamp.text == "訂正済", "ui: the stamp says corrected (%s)" % moss._stamp.text)
 	_check(not fix_slot.suspect and screen._tabs.get_tab_title(0) == "植物", "ui: suspect marks are cleared after the correction")
 	_check(screen._cmd_hint_active, "ui: command panel lights up after the correction")

@@ -102,7 +102,7 @@ class_name Keyword extends Resource
 @export var targets: Array[StringName]  # 正しくドロップできる NoteEntry/Blank の id
 
 class_name EventDef extends Resource
-@export var report_lines: Array[String]  # キーワードは "[kw:id]赤い斑点のキノコ[/kw]" 形式で埋め込み
+@export var report_lines: Array[String]  # キーワードは "[kw:id]青い斑点のキノコ[/kw]" 形式で埋め込み
 @export var time_limit: float            # 秒
 @export var base_target: int             # 判定の基準目標値
 @export var entry_id: StringName         # このイベントで正解となるノート項目
@@ -142,7 +142,7 @@ roll   = d20 + adventurer.stat[chosen_stat]
 
 | # | 報告（要約） | 照合 | 正解の指示 |
 |---|---|---|---|
-| 1 | 「赤い斑点のキノコを見つけたよ」 | キーワード「赤い斑点のキノコ」→ ノート「毒キノコの見分け方」にドロップ | 触らず通過（能力: 観察） |
+| 1 | 「青い斑点のキノコを見つけたよ」 | キーワード「青い斑点のキノコ」→ ノート「毒キノコの見分け方」にドロップ | 触らず通過（能力: 観察） |
 | 2 | 「爪の長い獣が来る！とっさに松明を振ったら、怯んで後ずさった！」（観察の報告） | 「松明」→ 虫食い `[ ？？？ ]` に「火」スタンプ（冒険者が見た事実が根拠。推測では埋めない） | 追い打ちをかける（能力: 戦闘）。ノートが更新される |
 | 3 | 「不気味な石像がある…」 | 「石像」→ ノート「石像の罠」にドロップ | 観察で隠しスイッチを探す（能力: 観察） |
 | 4 | 「ノートと違って、床が…」（食い違い） | 該当項目が光る → 訂正語をドロップ | 成長要素の体験 |

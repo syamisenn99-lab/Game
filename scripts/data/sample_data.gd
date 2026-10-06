@@ -13,7 +13,7 @@ static func adventurer() -> Adventurer:
 static func entries() -> Array[NoteEntry]:
 	var list: Array[NoteEntry] = []
 	list.append(_entry(&"mushroom_poison", &"plants", "毒キノコの見分け方",
-		"傘に赤い斑点があるものは猛毒。触れただけでも手がかぶれるらしい。"))
+		"傘に青い斑点があるものは猛毒。触れただけでも手がかぶれるらしい。"))
 	list.append(_entry(&"glow_moss", &"plants", "光る苔",
 		"暗い通路で光る苔は食べられる。苦味が強い。", {}, 0))
 	list.append(_entry(&"beast_claw", &"monsters", "鋭い爪の獣（第2層）",
@@ -31,7 +31,7 @@ static func entries() -> Array[NoteEntry]:
 static func events() -> Array[EventDef]:
 	var list: Array[EventDef] = []
 	list.append(_event(&"e1_mushroom",
-		"あっ、見て！洞窟の隅に[kw:mushroom]赤い斑点のキノコ[/kw]が生えてる。おいしそう…食べても平気かな？",
+		"あっ、見て！洞窟の隅に[kw:mushroom]青い斑点のキノコ[/kw]が生えてる。おいしそう…食べても平気かな？",
 		&"observe", 12, {&"mushroom": &"mushroom_poison"},
 		"待って、それは毒だ！",
 		"よく見たら怪しい色だね。触らずに通り過ぎたよ。",

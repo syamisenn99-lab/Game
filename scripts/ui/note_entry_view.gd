@@ -59,10 +59,12 @@ func setup(p_entry: NoteEntry, filled_blanks: Dictionary) -> void:
 	flow.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	vbox.add_child(flow)
 	for seg in entry.body_segments():
-		if seg["blank"] != &"":
-			var blank_id: StringName = seg["blank"]
+		if seg["blank"] != &"" or seg["fix"] != &"":
+			var is_fix: bool = seg["fix"] != &""
+			var blank_id: StringName = seg["fix"] if is_fix else seg["blank"]
 			var slot := BlankSlot.new()
-			slot.setup(blank_id, str(entry.blank_fills.get(blank_id, "？")), filled_blanks.has(blank_id))
+			slot.setup(blank_id, str(entry.blank_fills.get(blank_id, "？")), filled_blanks.has(blank_id),
+				str(entry.fix_olds.get(blank_id, "")) if is_fix else "")
 			slot.keyword_dropped.connect(func(kw: StringName, target: StringName) -> void: keyword_dropped.emit(kw, target))
 			slot.target_clicked.connect(func(target: StringName) -> void: target_clicked.emit(target))
 			flow.add_child(slot)
@@ -76,7 +78,8 @@ func setup(p_entry: NoteEntry, filled_blanks: Dictionary) -> void:
 				flow.add_child(label)
 
 
-func show_stamp(value: bool, animated: bool = false) -> void:
+func show_stamp(value: bool, animated: bool = false, text: String = "照合済") -> void:
+	_stamp.text = text
 	_stamp.visible = value
 	if value and animated:
 		_stamp.reset_size()

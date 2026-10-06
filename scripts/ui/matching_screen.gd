@@ -37,6 +37,7 @@ var _overlay: Control
 var _cmd_panel: PanelContainer
 var _cmd_pulse: Tween
 var _cmd_hint_active := false
+var _tab_base_titles: Array[String] = []
 
 
 func _ready() -> void:
@@ -225,6 +226,8 @@ func _build_notebook() -> void:
 		view.target_clicked.connect(_on_target_clicked)
 		(pages[entry.page] as VBoxContainer).add_child(view)
 		_entry_views[entry.id] = view
+	for i in _tabs.get_tab_count():
+		_tab_base_titles.append(_tabs.get_tab_title(i))
 
 
 # ---------------------------------------------------------------- イベント進行
@@ -247,6 +250,7 @@ func _start_next_event() -> void:
 	_reward_label.text = "持ち帰り報酬: %d" % int(state.reward)
 	_timer_bar.max_value = state.current.time_limit
 	_update_timer_ui()
+	_refresh_suspects()
 	if state.auto_matched:
 		_announce_known_note()
 
@@ -316,6 +320,33 @@ func _update_timer_ui() -> void:
 	_time_label.text = "%.1f" % state.time_left
 	var low := state.time_left < state.current.time_limit * 0.3
 	_timer_bar.modulate = Color(1.0, 0.55, 0.5) if low else Color.WHITE
+
+
+## ノートと報告が食い違っていて訂正できる箇所を、オレンジに脈打たせる。
+## 別のタブにあるときは、タブ名に「●」を付けて場所を知らせる。
+func _refresh_suspects() -> void:
+	_clear_suspects()
+	if state.current == null or state.resolved:
+		return
+	for target in state.current.keyword_targets.values():
+		var target_id := StringName(target)
+		if not state.is_fix(target_id) or state.is_blank_filled(target_id):
+			continue
+		var view := _view_for_target(target_id)
+		if view == null or not view.slots.has(target_id):
+			continue
+		(view.slots[target_id] as BlankSlot).set_suspect(true)
+		for i in _tabs.get_tab_count():
+			if _tabs.get_tab_control(i).is_ancestor_of(view):
+				_tabs.set_tab_title(i, _tab_base_titles[i] + " ●")
+
+
+func _clear_suspects() -> void:
+	for i in _tabs.get_tab_count():
+		_tabs.set_tab_title(i, _tab_base_titles[i])
+	for view: NoteEntryView in _entry_views.values():
+		for slot: BlankSlot in view.slots.values():
+			slot.set_suspect(false)
 
 
 ## 以前に埋めた虫食いのおかげで、照合済みで始まったとき: 該当の項目を見せて、すぐ指示へ誘導する
@@ -414,7 +445,7 @@ func _on_keyword_dropped(keyword_id: StringName, target_id: StringName) -> void:
 			_line_label.text = state.current.correct_line
 			var at := get_global_mouse_position()
 			if view != null:
-				view.show_stamp(true, true)
+				view.show_stamp(true, true, "訂正済" if state.is_fix(target_id) else "照合済")
 				view.flash(Color(0.7, 1.0, 0.75))
 				view.pop()
 				if state.is_blank(target_id) and view.slots.has(target_id):
@@ -424,8 +455,9 @@ func _on_keyword_dropped(keyword_id: StringName, target_id: StringName) -> void:
 					at = slot.get_global_rect().get_center()
 			Effects.burst(_overlay, at, Palette.HILITE_BG, 32)
 			Effects.burst(_overlay, at, Palette.OK, 14)
-			Effects.float_text(_overlay, "照合！", at + Vector2(0, -24), Palette.OK)
+			Effects.float_text(_overlay, "訂正！" if state.is_fix(target_id) else "照合！", at + Vector2(0, -24), Palette.OK)
 			_set_command_hint(true)
+			_refresh_suspects()
 		MatchingState.DropResult.MISMATCH:
 			_line_label.text = "うーん、ここじゃない気がする…（時間が %.1f 秒減った）" % Rules.MISMATCH_PENALTY_SEC
 			var at := get_global_mouse_position()
@@ -455,6 +487,7 @@ func _resolve(chosen: StringName) -> void:
 		return
 	_phase = Phase.ROLLING
 	_set_command_hint(false)
+	_clear_suspects()
 	_reveal_all()
 	_deselect_chip()
 	for chip in _chips:

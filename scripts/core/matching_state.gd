@@ -17,6 +17,8 @@ var resolved := false
 var filled_blanks: Dictionary = {}
 ## 穴 id -> それを持つノート項目 id
 var blank_owner: Dictionary = {}
+## 訂正箇所（ノートの記述が間違っているかもしれない場所）の id
+var fix_ids: Dictionary = {}
 var reward := Rules.INITIAL_REWARD
 var results: Array[Dictionary] = []
 
@@ -27,6 +29,8 @@ func _init(p_adventurer: Adventurer, p_events: Array[EventDef], p_entries: Array
 	for entry in p_entries:
 		for blank_id in entry.blank_fills:
 			blank_owner[StringName(blank_id)] = entry.id
+		for fix_id in entry.fix_olds:
+			fix_ids[StringName(fix_id)] = true
 
 
 func has_next() -> bool:
@@ -58,6 +62,10 @@ func tick(delta: float) -> bool:
 
 func is_blank(target_id: StringName) -> bool:
 	return blank_owner.has(target_id)
+
+
+func is_fix(target_id: StringName) -> bool:
+	return fix_ids.has(target_id)
 
 
 func is_blank_filled(blank_id: StringName) -> bool:

@@ -14,8 +14,12 @@ static func entries() -> Array[NoteEntry]:
 	var list: Array[NoteEntry] = []
 	list.append(_entry(&"mushroom_poison", &"plants", "毒キノコの見分け方",
 		"傘に青い斑点があるものは猛毒。触れただけでも手がかぶれるらしい。近づかず、触れないように避けて通ること。"))
-	list.append(_entry(&"glow_moss", &"plants", "光る苔",
-		"暗い通路で光る苔は食べられる。苦味が強い。毒のある苔と似ているので、よく調べてから採ること。", {}, 0))
+	# 又聞きの記述が間違っている例。報告と食い違ったとき、「食べられる」を訂正できる
+	var moss := _entry(&"glow_moss", &"plants", "光る苔",
+		"暗い通路で光る苔は{fix:moss_edible}。苦味が強い。胞子が舞うので、息を止めて離れて避けること。",
+		{&"moss_edible": "毒でしびれる"}, 0)
+	moss.fix_olds = {&"moss_edible": "食べられる"}
+	list.append(moss)
 	list.append(_entry(&"beast_claw", &"monsters", "鋭い爪の獣（第2層）",
 		"爪で獲物を引き裂く。{blank:beast_aversion}を極端に嫌うらしい。怯んだ隙に、正面から押し返して追い払える。",
 		{&"beast_aversion": "火"}, 0))
@@ -44,6 +48,7 @@ static func events() -> Array[EventDef]:
 		"台座を調べたら、裏にスイッチを見つけた！ 石像の目の光が消えたよ。",
 		"石像が動き出して、慌てて逃げ出した…荷物が少し落ちちゃった。"))
 	list.append(_event_beast_again())
+	list.append(_event_moss_contradiction())
 	return list
 
 
@@ -55,6 +60,16 @@ static func _entry_event_beast() -> EventDef:
 		"松明で怯んだ…ってことは、火が苦手なんだ！ノートに書いておくね。",
 		"火を突きつけながら押し返したら、獣は唸って去っていったよ。",
 		"押し切れなくて、飛びかかられて荷物の一部を落としちゃった…")
+
+
+## 食い違い: ノートには「食べられる」とあるが、報告では触ってしびれた。ノートを訂正して、回避を選ぶ。
+static func _event_moss_contradiction() -> EventDef:
+	return _event(&"e5_moss",
+		"光る苔がびっしり生えてる！…近づいたら、[kw:numb]手がしびれて[/kw]きた…！ ノートには食べられるって書いてあったよね？ どうしよう？",
+		&"evade", 12, {&"numb": &"moss_edible"},
+		"しびれるなんて…ノートが間違ってた。「毒でしびれる」に直しておくね。",
+		"息を止めて苔から離れたら、しびれもすぐに治まったよ。",
+		"しびれたまま慌てて動いて、荷物を少し落としちゃった…")
 
 
 ## 2匹目の獣。2つ目のイベントで「火」を埋めていれば、照合済みの状態で始まる（ノートが育った効果）。

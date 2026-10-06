@@ -1,7 +1,7 @@
 class_name BlankSlot
 extends PanelContainer
 ## ノートの虫食い穴。キーワードをドロップして確定する。
-## ドラッグ中は枠がうっすら脈打ち、その上に乗せると強く光る（項目そのものとは別の選択肢だと分かるように）。
+## ドラッグ中は枠がうっすら脈打ち、その上に乗せると強く光る（文字は変えない。項目そのものとは別の選択肢だと分かるように）。
 
 signal keyword_dropped(keyword_id: StringName, target_id: StringName)
 signal target_clicked(target_id: StringName)
@@ -62,14 +62,11 @@ func _refresh() -> void:
 		_label.text = fill_text
 		_label.add_theme_font_size_override("font_size", 28)
 		_label.add_theme_color_override("font_color", Palette.HILITE_LINE)
-	elif hint == Hint.HOVER:
-		_label.text = "ここ！"
-		_label.add_theme_font_size_override("font_size", 28)
-		_label.add_theme_color_override("font_color", Palette.INK)
 	else:
+		# 文字は変えず、枠の光り方だけで知らせる
 		_label.text = "？？？"
 		_label.add_theme_font_size_override("font_size", 26)
-		_label.add_theme_color_override("font_color", Palette.INK_FAINT)
+		_label.add_theme_color_override("font_color", Palette.INK if hint == Hint.HOVER else Palette.INK_FAINT)
 	add_theme_stylebox_override("panel", _make_style())
 
 

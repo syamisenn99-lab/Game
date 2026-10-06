@@ -225,7 +225,7 @@ func _test_slot_hover() -> void:
 	_push_mouse_motion(slot.get_global_rect().get_center(), MOUSE_BUTTON_MASK_LEFT)
 	await _frames(3)
 	_check(slot.hint == BlankSlot.Hint.HOVER and entry.hint != NoteEntryView.Hint.HOVER, "hover: only the slot lights up over the slot")
-	_check(slot._label.text == "ここ！", "hover: slot says here")
+	_check(slot._label.text == "？？？", "hover: the slot text stays the same (only the glow changes)")
 	_push_mouse_button(slot.get_global_rect().get_center(), false)
 	await _frames(4)
 	_check(screen.state.matched and slot.filled, "drop: the large slot accepts the torch")

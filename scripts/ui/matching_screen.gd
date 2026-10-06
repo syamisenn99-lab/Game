@@ -247,6 +247,8 @@ func _start_next_event() -> void:
 	_reward_label.text = "持ち帰り報酬: %d" % int(state.reward)
 	_timer_bar.max_value = state.current.time_limit
 	_update_timer_ui()
+	if state.auto_matched:
+		_announce_known_note()
 
 
 func _build_report() -> void:
@@ -314,6 +316,34 @@ func _update_timer_ui() -> void:
 	_time_label.text = "%.1f" % state.time_left
 	var low := state.time_left < state.current.time_limit * 0.3
 	_timer_bar.modulate = Color(1.0, 0.55, 0.5) if low else Color.WHITE
+
+
+## 以前に埋めた虫食いのおかげで、照合済みで始まったとき: 該当の項目を見せて、すぐ指示へ誘導する
+func _announce_known_note() -> void:
+	var blank_id := state.current.known_blank
+	var view := _view_for_target(blank_id)
+	if view == null:
+		return
+	# 該当ページへ自動で切り替える（ノートが効いたことを見せる）
+	for i in _tabs.get_tab_count():
+		if _tabs.get_tab_control(i).is_ancestor_of(view):
+			_tabs.current_tab = i
+	_line_label.text = state.current.known_line
+	_set_command_hint(true)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	if _phase != Phase.REPORTING or view == null or not is_instance_valid(view):
+		return
+	view.show_stamp(true, true)
+	view.flash(Color(0.7, 1.0, 0.75))
+	view.pop()
+	var slot_at := view.get_global_rect().get_center()
+	if view.slots.has(blank_id):
+		var slot := view.slots[blank_id] as BlankSlot
+		slot.pop()
+		slot_at = slot.get_global_rect().get_center()
+	Effects.burst(_overlay, slot_at, Palette.HILITE_BG, 32)
+	Effects.float_text(_overlay, "ノートが役に立った！", slot_at + Vector2(0, -34), Palette.OK, 28)
 
 
 ## 照合に成功したあと、「次は下の指示を選ぶ」と分かるように、指示パネルを光らせる（文字は出さない）

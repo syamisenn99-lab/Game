@@ -11,5 +11,9 @@ extends Resource
 ## キーワード id -> 正しいドロップ先（ノート項目 id または穴 id）
 @export var keyword_targets: Dictionary = {}
 @export var correct_line: String
+## この虫食いが既に埋まっていれば、照合済みの状態で始まる（ノートが育った効果）
+@export var known_blank: StringName
+## 照合済みで始まったときの主人公のセリフ
+@export var known_line: String
 @export var success_text: String
 @export var fail_text: String

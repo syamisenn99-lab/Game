@@ -43,6 +43,7 @@ static func events() -> Array[EventDef]:
 		"それは罠かも。壊さずに、台座を調べて隠しスイッチを探して！",
 		"台座を調べたら、裏にスイッチを見つけた！ 石像の目の光が消えたよ。",
 		"石像が動き出して、慌てて逃げ出した…荷物が少し落ちちゃった。"))
+	list.append(_event_beast_again())
 	return list
 
 
@@ -54,6 +55,21 @@ static func _entry_event_beast() -> EventDef:
 		"松明で怯んだ…ってことは、火が苦手なんだ！ノートに書いておくね。",
 		"火を突きつけながら押し返したら、獣は唸って去っていったよ。",
 		"押し切れなくて、飛びかかられて荷物の一部を落としちゃった…")
+
+
+## 2匹目の獣。2つ目のイベントで「火」を埋めていれば、照合済みの状態で始まる（ノートが育った効果）。
+## 埋めていなければ、報告の中の観察から自分で照合できる。制限時間は短め。
+static func _event_beast_again() -> EventDef:
+	var ev := _event(&"e4_beast_again",
+		"さっきの爪の長い獣が、また来た！[kw:torch]松明[/kw]を向けたら、すぐに怯んだみたい…！",
+		&"battle", 13, {&"torch": &"beast_aversion"},
+		"今度も火が効いてる！",
+		"松明をかざして押し返したら、獣はあっさり逃げていったよ。ノートのおかげだね。",
+		"油断しちゃった…少し荷物を落としちゃった。")
+	ev.time_limit = 15.0
+	ev.known_blank = &"beast_aversion"
+	ev.known_line = "あ、ノートに「火」って書いてある！ これなら落ち着いて追い払えるよ！"
+	return ev
 
 
 static func _entry(id: StringName, page: StringName, title: String, body: String,

@@ -90,6 +90,21 @@ func _test_state() -> void:
 	s3.begin_next_event()
 	_check(s3.is_blank_filled(&"beast_aversion"), "state: blank stays filled in later events")
 
+	# 2匹目の獣: 「火」を埋めていれば照合済みで始まる。埋めていなければ自分で照合する
+	var s6 := _new_state()
+	s6.begin_next_event(); s6.begin_next_event()
+	s6.drop(&"torch", &"beast_aversion")
+	s6.begin_next_event(); s6.begin_next_event()
+	_check(s6.current.id == &"e4_beast_again", "state: fourth event is the second beast")
+	_check(s6.matched and s6.auto_matched, "state: known note starts the fourth event as matched")
+	_check(is_equal_approx(s6.time_left, 15.0), "state: second beast has a short time limit")
+	_check(s6.drop(&"torch", &"beast_aversion") == MatchingState.DropResult.IGNORED, "state: no double matching")
+	var s7 := _new_state()
+	for i in 4:
+		s7.begin_next_event()
+	_check(not s7.matched and not s7.auto_matched, "state: without the note the fourth event is not pre-matched")
+	_check(s7.drop(&"torch", &"beast_aversion") == MatchingState.DropResult.MATCHED, "state: the fourth event can still be matched by hand")
+
 	# 時間切れは一度だけ通知される
 	var s4 := _new_state()
 	s4.begin_next_event()
@@ -158,6 +173,18 @@ func _test_ui_flow() -> void:
 	await create_timer(1.2).timeout
 	_check(screen.state.results.size() == 3, "ui: timeout resolved the third event (results=%d)" % screen.state.results.size())
 	_check(screen.state.results[2]["chosen"] == &"", "ui: timeout is a no-instruction result")
+	# 4つ目: 2つ目で埋めた「火」のおかげで、照合済みで始まる
+	screen._start_next_event()
+	await _frames(4)
+	_check(screen.state.current.id == &"e4_beast_again" and screen.state.matched, "ui: fourth event starts pre-matched")
+	_check(screen._cmd_hint_active, "ui: command panel is already lit")
+	var beast_view: NoteEntryView = screen._entry_views[&"beast_claw"]
+	_check(beast_view._stamp.visible, "ui: the beast note shows the stamp")
+	_check(screen._tabs.get_tab_control(screen._tabs.current_tab).is_ancestor_of(beast_view), "ui: the monsters page is opened automatically")
+	_check(screen._line_label.text.contains("ノートに"), "ui: the protagonist reacts to the note")
+	screen._on_stat_chosen(&"battle")
+	await create_timer(1.0).timeout
+	_check(screen.state.results.size() == 4, "ui: fourth event resolved")
 	screen._start_next_event()
 	await _frames(2)
 	_check(screen._phase == MatchingScreen.Phase.SUMMARY, "ui: summary after the last event")

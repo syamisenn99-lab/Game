@@ -10,6 +10,8 @@ var event_index := -1
 var current: EventDef
 var time_left := 0.0
 var matched := false
+## 以前に埋めた虫食いのおかげで、照合済みで始まったイベントか
+var auto_matched := false
 var resolved := false
 ## 埋まった穴の id（イベントをまたいで保持される = ノートの成長）
 var filled_blanks: Dictionary = {}
@@ -38,7 +40,11 @@ func begin_next_event() -> bool:
 	current = events[event_index]
 	time_left = current.time_limit
 	matched = false
+	auto_matched = false
 	resolved = false
+	if current.known_blank != &"" and is_blank_filled(current.known_blank):
+		matched = true
+		auto_matched = true
 	return true
 
 

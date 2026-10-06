@@ -516,8 +516,8 @@ func _clear_suspects() -> void:
 func _default_known_line(target_id: StringName) -> String:
 	var text: String = state.fill_texts.get(target_id, "")
 	if state.is_fix(target_id):
-		return "ノートは前に直してあるから、「%s」って分かってる！" % text
-	return "あ、ノートに「%s」って書いてある！ これなら落ち着いて動けるよ！" % text
+		return "（ノートは前に直してある。「%s」と分かっている）" % text
+	return "（ノートに「%s」と書いてある。これなら、指示が出せる）" % text
 
 
 ## 以前に埋めた虫食いのおかげで、照合済みで始まったとき: 該当の項目を見せて、すぐ指示へ誘導する

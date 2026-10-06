@@ -10,11 +10,17 @@ var event_index := -1
 var current: EventDef
 var time_left := 0.0
 var matched := false
-## 以前に埋めた虫食いのおかげで、照合済みで始まったイベントか
+## 以前の探索で埋めた（訂正した）ノートのおかげで、照合済みで始まったイベントか
 var auto_matched := false
+## そのときの、すでに埋まっていた箇所の id
+var auto_target: StringName = &""
 var resolved := false
-## 埋まった穴の id（イベントをまたいで保持される = ノートの成長）
+## 埋まった穴・訂正した箇所の id（探索をまたいで保持される = ノートの成長）。GameSession と同じ辞書を共有できる
 var filled_blanks: Dictionary = {}
+## 埋まった（訂正された）ときに表示する語。id -> 語
+var fill_texts: Dictionary = {}
+## この探索で新しくノートに書けた箇所（id の並び）
+var learned: Array[StringName] = []
 ## 穴 id -> それを持つノート項目 id
 var blank_owner: Dictionary = {}
 ## 訂正箇所（ノートの記述が間違っているかもしれない場所）の id
@@ -23,12 +29,15 @@ var reward := Rules.INITIAL_REWARD
 var results: Array[Dictionary] = []
 
 
-func _init(p_adventurer: Adventurer, p_events: Array[EventDef], p_entries: Array[NoteEntry]) -> void:
+func _init(p_adventurer: Adventurer, p_events: Array[EventDef], p_entries: Array[NoteEntry],
+		p_filled: Dictionary = {}) -> void:
 	adventurer = p_adventurer
 	events = p_events
+	filled_blanks = p_filled
 	for entry in p_entries:
 		for blank_id in entry.blank_fills:
 			blank_owner[StringName(blank_id)] = entry.id
+			fill_texts[StringName(blank_id)] = str(entry.blank_fills[blank_id])
 		for fix_id in entry.fix_olds:
 			fix_ids[StringName(fix_id)] = true
 
@@ -45,10 +54,16 @@ func begin_next_event() -> bool:
 	time_left = current.time_limit
 	matched = false
 	auto_matched = false
+	auto_target = &""
 	resolved = false
-	if current.known_blank != &"" and is_blank_filled(current.known_blank):
-		matched = true
-		auto_matched = true
+	# このイベントの正解が、以前の探索で埋めた（訂正した）箇所なら、照合済みで始まる
+	for target in current.keyword_targets.values():
+		var target_id := StringName(target)
+		if is_blank(target_id) and is_blank_filled(target_id):
+			matched = true
+			auto_matched = true
+			auto_target = target_id
+			break
 	return true
 
 
@@ -83,6 +98,7 @@ func drop(keyword_id: StringName, target_id: StringName) -> DropResult:
 		matched = true
 		if is_blank(target_id):
 			filled_blanks[target_id] = true
+			learned.append(target_id)
 		return DropResult.MATCHED
 	time_left = maxf(0.0, time_left - Rules.MISMATCH_PENALTY_SEC)
 	return DropResult.MISMATCH

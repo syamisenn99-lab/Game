@@ -6,9 +6,13 @@ const MATCHING_SCENE := "res://scenes/matching_screen.tscn"
 const STAT_ORDER: Array[StringName] = [&"battle", &"explore", &"evade"]
 
 var cards: Dictionary = {}
+var notebook_label: Label
+var reset_button: Button
+var _reset_armed := false
 
 
 func _ready() -> void:
+	GameSession.load_notebook()
 	theme = Palette.make_theme()
 	var desk := ColorRect.new()
 	desk.color = Palette.DESK
@@ -42,6 +46,20 @@ func _ready() -> void:
 		var card := _build_card(adventurer)
 		row.add_child(card)
 		cards[adventurer.id] = card
+
+	# ノートの育ち（探索をまたいで引き継がれる）
+	var footer := HBoxContainer.new()
+	footer.add_theme_constant_override("separation", 16)
+	root.add_child(footer)
+	notebook_label = Label.new()
+	notebook_label.add_theme_color_override("font_color", Palette.DESK_TEXT)
+	notebook_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	footer.add_child(notebook_label)
+	reset_button = Button.new()
+	reset_button.custom_minimum_size = Vector2(300, 40)
+	reset_button.pressed.connect(request_reset)
+	footer.add_child(reset_button)
+	_refresh_notebook_info()
 
 
 func _build_card(adventurer: Adventurer) -> PanelContainer:
@@ -92,6 +110,28 @@ func _wrapped(text: String, color: Color) -> Label:
 	label.autowrap_mode = TextServer.AUTOWRAP_ARBITRARY
 	label.add_theme_color_override("font_color", color)
 	return label
+
+
+func _refresh_notebook_info() -> void:
+	var spots := SampleData.growth_spots()
+	var learned: Array[String] = []
+	for id in spots:
+		if GameSession.filled_blanks.has(id):
+			learned.append("「%s」" % spots[id])
+	notebook_label.text = "ノートの育ち %d / %d" % [learned.size(), spots.size()]
+	if not learned.is_empty():
+		notebook_label.text += "　書けたこと: " + "、".join(learned)
+	reset_button.text = "本当に消す？ もう一度押すとリセット" if _reset_armed else "ノートを最初に戻す"
+
+
+## ノートのリセット。誤って消さないよう、2回押して確定する。
+func request_reset() -> void:
+	if not _reset_armed:
+		_reset_armed = true
+	else:
+		_reset_armed = false
+		GameSession.reset_notebook()
+	_refresh_notebook_info()
 
 
 ## 冒険者を選んで探索へ。テストでは go=false にしてシーン遷移を避ける。

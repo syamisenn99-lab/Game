@@ -57,6 +57,15 @@ static func entries() -> Array[NoteEntry]:
 	return list
 
 
+## ノートに書き込める（虫食い・訂正）箇所の id と、埋まったときの語
+static func growth_spots() -> Dictionary:
+	var spots: Dictionary = {}
+	for entry in entries():
+		for id in entry.blank_fills:
+			spots[StringName(id)] = str(entry.blank_fills[id])
+	return spots
+
+
 static func events(id: StringName = CHILDHOOD) -> Array[EventDef]:
 	if id == MERCENARY:
 		return _mercenary_events()
@@ -150,7 +159,6 @@ static func _event_beast_again() -> EventDef:
 		"松明をかざして押し返したら、獣はあっさり逃げていったよ。ノートのおかげだね。",
 		"油断しちゃった…少し荷物を落としちゃった。")
 	ev.time_limit = 15.0
-	ev.known_blank = &"beast_aversion"
 	ev.known_line = "あ、ノートに「火」って書いてある！ これなら落ち着いて追い払えるよ！"
 	return ev
 

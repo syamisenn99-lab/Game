@@ -46,8 +46,9 @@ func _ready() -> void:
 	_build_ui()
 	var entries := SampleData.entries()
 	_entries = entries
+	GameSession.load_notebook()
 	var adventurer := SampleData.adventurer(GameSession.adventurer_id)
-	state = MatchingState.new(adventurer, SampleData.events(adventurer.id), entries)
+	state = MatchingState.new(adventurer, SampleData.events(adventurer.id), entries, GameSession.filled_blanks)
 	_name_label.text = "通信中: %s" % state.adventurer.display_name
 	_build_notebook()
 	_start_next_event()
@@ -337,9 +338,16 @@ func _clear_suspects() -> void:
 			slot.set_suspect(false)
 
 
+func _default_known_line(target_id: StringName) -> String:
+	var text: String = state.fill_texts.get(target_id, "")
+	if state.is_fix(target_id):
+		return "ノートは前に直してあるから、「%s」って分かってる！" % text
+	return "あ、ノートに「%s」って書いてある！ これなら落ち着いて動けるよ！" % text
+
+
 ## 以前に埋めた虫食いのおかげで、照合済みで始まったとき: 該当の項目を見せて、すぐ指示へ誘導する
 func _announce_known_note() -> void:
-	var blank_id := state.current.known_blank
+	var blank_id := state.auto_target
 	var view := _view_for_target(blank_id)
 	if view == null:
 		return
@@ -347,7 +355,7 @@ func _announce_known_note() -> void:
 	for i in _tabs.get_tab_count():
 		if _tabs.get_tab_control(i).is_ancestor_of(view):
 			_tabs.current_tab = i
-	_line_label.text = state.current.known_line
+	_line_label.text = state.current.known_line if state.current.known_line != "" else _default_known_line(blank_id)
 	_set_command_hint(true)
 	await get_tree().process_frame
 	await get_tree().process_frame
@@ -446,6 +454,7 @@ func _on_keyword_dropped(keyword_id: StringName, target_id: StringName) -> void:
 			Effects.float_text(_overlay, "訂正！" if state.is_fix(target_id) else "照合！", at + Vector2(0, -24), Palette.OK)
 			_set_command_hint(true)
 			_refresh_suspects()
+			GameSession.save_notebook()
 		MatchingState.DropResult.MISMATCH:
 			_line_label.text = "うーん、ここじゃない気がする…（時間が %.1f 秒減った）" % Rules.MISMATCH_PENALTY_SEC
 			var at := get_global_mouse_position()
@@ -535,6 +544,14 @@ func _show_summary() -> void:
 		var line := Label.new()
 		line.text = "%d. %s（d20=%d）" % [i + 1, "成功" if res["success"] else "失敗", res["roll"]]
 		vbox.add_child(line)
+	if not state.learned.is_empty():
+		var learned_label := Label.new()
+		var texts: Array[String] = []
+		for id in state.learned:
+			texts.append("「%s」" % state.fill_texts.get(id, "?"))
+		learned_label.text = "ノートに書けたこと: " + "、".join(texts)
+		learned_label.add_theme_color_override("font_color", Palette.OK)
+		vbox.add_child(learned_label)
 	var total := Label.new()
 	total.text = "持ち帰り報酬: %d / %d" % [int(state.reward), int(Rules.INITIAL_REWARD)]
 	total.add_theme_font_size_override("font_size", 26)

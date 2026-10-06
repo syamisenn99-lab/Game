@@ -18,7 +18,16 @@ func _check(cond: bool, message: String) -> void:
 		printerr("FAIL: ", message)
 
 
+func _reset_session() -> void:
+	# テストではファイルを読み書きせず、ノートは毎回まっさらにする
+	GameSession.persist = false
+	GameSession._loaded = true
+	GameSession.reset_notebook()
+	GameSession.adventurer_id = SampleData.CHILDHOOD
+
+
 func _run() -> void:
+	_reset_session()
 	_test_parser()
 	_test_note_entry()
 	_test_judge()
@@ -30,6 +39,8 @@ func _run() -> void:
 	_test_mercenary_data()
 	await _test_start_screen()
 	await _test_mercenary_flow()
+	_test_carry_over()
+	await _test_carry_over_ui()
 	print("%d checks, %d failures" % [_checks, _failures])
 	quit(1 if _failures > 0 else 0)
 
@@ -150,6 +161,7 @@ func _frames(n: int) -> void:
 
 
 func _test_ui_flow() -> void:
+	_reset_session()
 	var screen: MatchingScreen = load("res://scenes/matching_screen.tscn").instantiate()
 	root.add_child(screen)
 	await _frames(3)
@@ -237,6 +249,7 @@ func _test_ui_flow() -> void:
 
 ## ドロップ結果の演出（出て、終わったら片付く）
 func _test_effects() -> void:
+	_reset_session()
 	root.size = Vector2i(1280, 720)
 	var screen: MatchingScreen = load("res://scenes/matching_screen.tscn").instantiate()
 	root.add_child(screen)
@@ -267,6 +280,7 @@ func _test_effects() -> void:
 
 ## 獣の穴: ドラッグ中、穴の上では穴だけが光り、項目の上（穴の外）では項目だけが光る
 func _test_slot_hover() -> void:
+	_reset_session()
 	root.size = Vector2i(1280, 720)
 	var screen: MatchingScreen = load("res://scenes/matching_screen.tscn").instantiate()
 	root.add_child(screen)
@@ -333,6 +347,7 @@ func _test_mercenary_data() -> void:
 
 ## 選択画面: 2人が並び、選ぶとセッションに保存される
 func _test_start_screen() -> void:
+	_reset_session()
 	var screen: StartScreen = load("res://scenes/start_screen.tscn").instantiate()
 	root.add_child(screen)
 	await _frames(3)
@@ -347,6 +362,7 @@ func _test_start_screen() -> void:
 
 ## 傭兵で最後まで遊ぶ（実際の画面を通す）
 func _test_mercenary_flow() -> void:
+	_reset_session()
 	GameSession.adventurer_id = SampleData.MERCENARY
 	var screen: MatchingScreen = load("res://scenes/matching_screen.tscn").instantiate()
 	root.add_child(screen)
@@ -381,8 +397,93 @@ func _test_mercenary_flow() -> void:
 	await _frames(2)
 
 
+## ノートの引き継ぎ
+func _test_carry_over() -> void:
+	_reset_session()
+	# 同じ辞書を共有すると、別の探索（別の冒険者）にも育ちが引き継がれる
+	var shared: Dictionary = {}
+	var first := MatchingState.new(SampleData.adventurer(SampleData.CHILDHOOD), SampleData.events(SampleData.CHILDHOOD), SampleData.entries(), shared)
+	first.begin_next_event(); first.begin_next_event()
+	_check(not first.auto_matched, "carry: nothing is known on the first run")
+	first.drop(&"torch", &"beast_aversion")
+	_check(shared.has(&"beast_aversion") and first.learned == [&"beast_aversion"], "carry: the fill is shared and recorded as learned")
+	var second := MatchingState.new(SampleData.adventurer(SampleData.MERCENARY), SampleData.events(SampleData.MERCENARY), SampleData.entries(), shared)
+	second.begin_next_event()
+	_check(not second.auto_matched, "carry: an unrelated event is not pre-matched")
+	second.begin_next_event()
+	_check(second.current.id == &"m2_beast" and second.auto_matched and second.auto_target == &"beast_aversion", "carry: the mercenary's beast event starts pre-matched")
+	_check(second.drop(&"torch", &"beast_aversion") == MatchingState.DropResult.IGNORED, "carry: no double matching")
+	_check(second.learned.is_empty(), "carry: nothing new is learned the second time")
+	# 引数を省略した状態は、互いに共有されない
+	var a := MatchingState.new(SampleData.adventurer(), SampleData.events(), SampleData.entries())
+	var b := MatchingState.new(SampleData.adventurer(), SampleData.events(), SampleData.entries())
+	a.begin_next_event(); a.begin_next_event(); a.drop(&"torch", &"beast_aversion")
+	_check(not b.filled_blanks.has(&"beast_aversion"), "carry: states without a shared dictionary stay separate")
+	# 幼なじみの訂正（苔）も、同じ仕組みで引き継がれる
+	var third := MatchingState.new(SampleData.adventurer(), SampleData.events(), SampleData.entries(), {&"moss_safe": true})
+	for i in 5:
+		third.begin_next_event()
+	_check(third.current.id == &"e5_moss" and third.auto_matched and third.auto_target == &"moss_safe", "carry: a known correction pre-matches the contradiction event")
+
+	# ファイルへの保存と読み込み
+	var temp_path := "user://test_notebook.json"
+	GameSession.persist = true
+	GameSession.save_path = temp_path
+	GameSession.filled_blanks = {&"beast_aversion": true, &"moss_safe": true}
+	GameSession.save_notebook()
+	GameSession.filled_blanks = {}
+	GameSession._loaded = false
+	GameSession.load_notebook()
+	_check(GameSession.filled_blanks.has(&"beast_aversion") and GameSession.filled_blanks.has(&"moss_safe"), "carry: the notebook is saved and loaded")
+	GameSession.reset_notebook()
+	GameSession._loaded = false
+	GameSession.filled_blanks = {}
+	GameSession.load_notebook()
+	_check(GameSession.filled_blanks.is_empty(), "carry: reset also clears the saved file")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(temp_path))
+	GameSession.save_path = "user://notebook.json"
+	_reset_session()
+
+
+## 引き継いだノートで探索を始める（画面）。選択画面の表示とリセットも確認する。
+func _test_carry_over_ui() -> void:
+	_reset_session()
+	GameSession.filled_blanks[&"beast_aversion"] = true
+	var screen: MatchingScreen = load("res://scenes/matching_screen.tscn").instantiate()
+	root.add_child(screen)
+	await _frames(3)
+	var beast: NoteEntryView = screen._entry_views[&"beast_claw"]
+	var slot: BlankSlot = beast.slots[&"beast_aversion"]
+	_check(slot.filled and slot._label.text == "火", "carry ui: the known fill is already written in the note")
+	# 幼なじみのイベント2（獣）は、照合済みで始まる
+	screen.state.resolved = true
+	screen._start_next_event()
+	await _frames(4)
+	_check(screen.state.auto_matched and screen._cmd_hint_active, "carry ui: the beast event starts pre-matched and the commands are lit")
+	_check(screen._line_label.text.contains("火"), "carry ui: the protagonist mentions what the note says (%s)" % screen._line_label.text)
+	screen.queue_free()
+	await _frames(2)
+
+	_reset_session()
+	var start: StartScreen = load("res://scenes/start_screen.tscn").instantiate()
+	root.add_child(start)
+	await _frames(3)
+	_check(start.notebook_label.text.contains("0 / 2"), "carry ui: the start screen shows no growth at first (%s)" % start.notebook_label.text)
+	GameSession.filled_blanks[&"beast_aversion"] = true
+	start._refresh_notebook_info()
+	_check(start.notebook_label.text.contains("1 / 2") and start.notebook_label.text.contains("火"), "carry ui: the start screen shows what has been written (%s)" % start.notebook_label.text)
+	start.request_reset()
+	_check(GameSession.filled_blanks.has(&"beast_aversion"), "carry ui: the first press only asks for confirmation")
+	start.request_reset()
+	_check(GameSession.filled_blanks.is_empty() and start.notebook_label.text.contains("0 / 2"), "carry ui: the second press resets the notebook")
+	start.queue_free()
+	await _frames(2)
+	_reset_session()
+
+
 ## 実際のマウス入力（押す→動かす→離す）でドラッグ＆ドロップできるか。
 func _test_real_drag() -> void:
+	_reset_session()
 	# ヘッドレスのウィンドウは 64x64 なので、入力が届くよう実寸にする
 	root.size = Vector2i(1280, 720)
 	var screen: MatchingScreen = load("res://scenes/matching_screen.tscn").instantiate()

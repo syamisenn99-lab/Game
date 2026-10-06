@@ -126,7 +126,7 @@ func _refresh_notebook_info() -> void:
 	var learned: Array[String] = []
 	for id in spots:
 		if GameSession.filled_blanks.has(id):
-			learned.append("「%s」" % spots[id])
+			learned.append(spots[id])
 	notebook_label.text = "ノートの育ち %d / %d" % [learned.size(), spots.size()]
 	if not learned.is_empty():
 		notebook_label.text += "　書けたこと: " + "、".join(learned)

@@ -244,6 +244,21 @@ func _test_ui_flow() -> void:
 	screen._on_stat_chosen(&"evade")
 	await create_timer(1.0).timeout
 	_check(screen.state.results.size() == 5, "ui: fifth event resolved")
+
+	# 6つ目・7つ目: 落とし穴の目印（穴埋め）と深さ（訂正）
+	for step in [[&"dark_floor", &"pit_sign"], [&"no_bottom", &"pit_depth"]]:
+		screen._start_next_event()
+		await _frames(3)
+		screen._reveal_all()
+		await _frames(2)
+		screen._on_keyword_dropped(step[0], step[1])
+		_check(screen.state.matched, "ui: %s is matched" % step[1])
+		screen._on_stat_chosen(&"evade")
+		await create_timer(1.0).timeout
+	var pit: NoteEntryView = screen._entry_views[&"pit_trap"]
+	_check((pit.slots[&"pit_sign"] as BlankSlot)._label.text == "色", "ui: the pit sign is written in the note")
+	_check((pit.slots[&"pit_depth"] as BlankSlot)._label.text == "底が見えないほど深い", "ui: the pit depth is corrected")
+	_check(screen.state.results.size() == 7, "ui: seventh event resolved")
 	screen._start_next_event()
 	await _frames(2)
 	_check(screen._phase == MatchingScreen.Phase.SUMMARY, "ui: summary after the last event")
@@ -332,9 +347,9 @@ func _test_mercenary_data() -> void:
 	_check(merc.display_name == "傭兵" and merc.stat_for(&"battle") > merc.stat_for(&"explore"), "merc: strong in battle, weak in explore")
 	_check(merc.chars_per_sec > SampleData.adventurer(SampleData.CHILDHOOD).chars_per_sec, "merc: reports come in faster")
 	var events := SampleData.events(SampleData.MERCENARY)
-	_check(events.size() == 4, "merc: four events (%d)" % events.size())
+	_check(events.size() == 6, "merc: six events (%d)" % events.size())
 	var state := MatchingState.new(merc, events, SampleData.entries())
-	var expected := [&"evade", &"battle", &"explore", &"explore"]
+	var expected := [&"evade", &"battle", &"explore", &"explore", &"battle", &"explore"]
 	var i := 0
 	while state.begin_next_event():
 		var ev := state.current
@@ -344,7 +359,7 @@ func _test_mercenary_data() -> void:
 		_check(state.drop(kw, target) == MatchingState.DropResult.MATCHED, "merc: event %d matches by the intended keyword" % (i + 1))
 		_check(ReportParser.parse(ev.report).any(func(seg: Dictionary) -> bool: return seg["kw"] == kw), "merc: event %d report contains its keyword" % (i + 1))
 		i += 1
-	_check(i == 4, "merc: iterated all events")
+	_check(i == 6, "merc: iterated all events")
 	# 手がかりを流しがちな傭兵: 3つ目のキーワードは「金にならん」と一緒に流される
 	_check(events[2].report.contains("金にならん"), "merc: the relic clue is brushed off in the report")
 
@@ -378,6 +393,8 @@ func _test_mercenary_flow() -> void:
 		[&"torch", &"beast_aversion", &"battle"],
 		[&"pattern", &"geo_pattern", &"explore"],
 		[&"statue", &"statue_trap", &"explore"],
+		[&"clap", &"bat_weak", &"battle"],
+		[&"glow_text", &"tablet_light", &"explore"],
 	]
 	for n in steps.size():
 		if n > 0:
@@ -390,7 +407,7 @@ func _test_mercenary_flow() -> void:
 		_check(screen.state.matched, "merc ui: event %d is matched" % (n + 1))
 		screen._on_stat_chosen(step[2])
 		await create_timer(1.0).timeout
-	_check(screen.state.results.size() == 4, "merc ui: four events resolved")
+	_check(screen.state.results.size() == 6, "merc ui: six events resolved")
 	for res in screen.state.results:
 		_check(res["target"] == res["base_target"] + Rules.MOD_MATCHED_CORRECT_STAT, "merc ui: correct play lowers the target")
 	screen._start_next_event()
@@ -418,6 +435,7 @@ func _test_carry_over() -> void:
 	_check(second.current.id == &"m2_beast" and second.auto_matched and second.auto_target == &"beast_aversion", "carry: the mercenary's beast event starts pre-matched")
 	_check(second.drop(&"torch", &"beast_aversion") == MatchingState.DropResult.IGNORED, "carry: no double matching")
 	_check(second.learned.is_empty(), "carry: nothing new is learned the second time")
+	_check(SampleData.growth_spots().size() == 6, "carry: the note has six spots that can grow (%d)" % SampleData.growth_spots().size())
 	# 引数を省略した状態は、互いに共有されない
 	var a := MatchingState.new(SampleData.adventurer(), SampleData.events(), SampleData.entries())
 	var b := MatchingState.new(SampleData.adventurer(), SampleData.events(), SampleData.entries())
@@ -472,14 +490,14 @@ func _test_carry_over_ui() -> void:
 	var start: StartScreen = load("res://scenes/start_screen.tscn").instantiate()
 	root.add_child(start)
 	await _frames(3)
-	_check(start.notebook_label.text.contains("0 / 2"), "carry ui: the start screen shows no growth at first (%s)" % start.notebook_label.text)
+	_check(start.notebook_label.text.contains("0 / 6"), "carry ui: the start screen shows no growth at first (%s)" % start.notebook_label.text)
 	GameSession.filled_blanks[&"beast_aversion"] = true
 	start._refresh_notebook_info()
-	_check(start.notebook_label.text.contains("1 / 2") and start.notebook_label.text.contains("火"), "carry ui: the start screen shows what has been written (%s)" % start.notebook_label.text)
+	_check(start.notebook_label.text.contains("1 / 6") and start.notebook_label.text.contains("火"), "carry ui: the start screen shows what has been written (%s)" % start.notebook_label.text)
 	start.request_reset()
 	_check(GameSession.filled_blanks.has(&"beast_aversion"), "carry ui: the first press only asks for confirmation")
 	start.request_reset()
-	_check(GameSession.filled_blanks.is_empty() and start.notebook_label.text.contains("0 / 2"), "carry ui: the second press resets the notebook")
+	_check(GameSession.filled_blanks.is_empty() and start.notebook_label.text.contains("0 / 6"), "carry ui: the second press resets the notebook")
 	start.queue_free()
 	await _frames(2)
 	_reset_session()

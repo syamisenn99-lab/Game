@@ -45,24 +45,30 @@ static func entries() -> Array[NoteEntry]:
 		"爪で獲物を引き裂く。{blank:beast_aversion}を極端に嫌うらしい。怯んだ隙に、正面から押し返して追い払える。",
 		{&"beast_aversion": "火"}, 0))
 	list.append(_entry(&"cave_bat", &"monsters", "岩穴の蝙蝠",
-		"群れで天井に張りつく。大きな音に弱い。刺激せず、静かに離れるのがいちばん。"))
+		"群れで天井に張りつく。{blank:bat_weak}に弱いらしい。弱点を突けば追い払える。ふだんは刺激せず、静かに離れて通ること。",
+		{&"bat_weak": "大きな音"}, 0))
 	list.append(_entry(&"statue_trap", &"traps", "石像の罠",
 		"目が光る石像は台座に隠しスイッチがある。台座をよく調べて見つけて押せば止まる。壊そうとすると作動する。"))
-	list.append(_entry(&"pit_trap", &"traps", "落とし穴",
-		"床の色が違う場所は踏まずに避けて通ること。"))
+	# 落とし穴: 目印は虫食い、深さは間違った記述（どちらも冒険者の報告で育つ）
+	var pit := _entry(&"pit_trap", &"traps", "落とし穴",
+		"床の{blank:pit_sign}が違う場所に、落とし穴が仕掛けられている。穴は{fix:pit_depth}。見つけたら、踏まずに避けて通ること。",
+		{&"pit_sign": "色", &"pit_depth": "底が見えないほど深い"}, 0)
+	pit.fix_olds = {&"pit_depth": "浅い"}
+	list.append(pit)
 	list.append(_entry(&"geo_pattern", &"relics", "壁や床の幾何学模様",
 		"壁と床に同じ幾何学模様があるのは、仕掛けの合図。模様をたどってよく調べると、隠された扉が見つかる。", {}, 0))
 	list.append(_entry(&"old_tablet", &"relics", "古い石板",
-		"文字が刻まれた石板は、古代の記録。持ち帰れば高く売れるが、とても重い。"))
+		"文字が刻まれた石板は、古代の記録。{blank:tablet_light}を近づけると文字が浮かぶ。浮かんだ文字を調べれば、隠し部屋の場所が分かることがある。持ち帰れば高く売れるが、とても重い。",
+		{&"tablet_light": "灯り"}, 0))
 	return list
 
 
-## ノートに書き込める（虫食い・訂正）箇所の id と、埋まったときの語
+## ノートに書き込める（虫食い・訂正）箇所の id -> 表示用の名前（例: 「火」（鋭い爪の獣））
 static func growth_spots() -> Dictionary:
 	var spots: Dictionary = {}
 	for entry in entries():
 		for id in entry.blank_fills:
-			spots[StringName(id)] = str(entry.blank_fills[id])
+			spots[StringName(id)] = "「%s」（%s）" % [entry.blank_fills[id], entry.title]
 	return spots
 
 
@@ -89,6 +95,18 @@ static func _childhood_events() -> Array[EventDef]:
 		"石像が動き出して、慌てて逃げ出した…荷物が少し落ちちゃった。"))
 	list.append(_event_beast_again())
 	list.append(_event_moss_contradiction())
+	list.append(_event(&"e6_pit_sign",
+		"通路の床に、[kw:dark_floor]色の濃い四角い床[/kw]がある。試しに石を投げたら、床が抜けて石が落ちていった…落とし穴だ！ ここ、どうしよう？",
+		&"evade", 12, {&"dark_floor": &"pit_sign"},
+		"床の色が違う場所…それが落とし穴の目印なんだ。ノートに書いておくね。",
+		"色の濃い床を避けて、遠回りして渡れたよ。",
+		"つい近づいちゃって、足を取られた…荷物が少し落ちたよ。"))
+	list.append(_event(&"e7_pit_depth",
+		"奥の落とし穴に石を落としたら、[kw:no_bottom]いつまで経っても音がしない[/kw]…。底が見えないよ…！ ノートには浅いって書いてあったよね？ どうしよう？",
+		&"evade", 12, {&"no_bottom": &"pit_depth"},
+		"底が見えないなんて…ノートが間違ってた。「底が見えないほど深い」に直しておくね。",
+		"縁から離れて、慎重に迂回できたよ。落ちたら戻れなかったね…",
+		"縁に近づきすぎて、ひやっとした…荷物が少し落ちちゃった。"))
 	return list
 
 
@@ -129,6 +147,19 @@ static func _mercenary_events() -> Array[EventDef]:
 		"壊すと作動する、ってノートに書いてある。台座を調べさせよう。",
 		"台座にスイッチ。壊すより安く済んだな。",
 		"止まらなかったか。…荷が少し減った。"))
+	list.append(_merc_event(&"m5_bats_again",
+		"またコウモリ。天井に群れ。…[kw:clap]手を叩いたら、三体とも飛び去った[/kw]。音が効くらしい。追い払うか、判断しろ。",
+		&"battle", 13, {&"clap": &"bat_weak"},
+		"手を叩いたら逃げた…大きな音に弱いってことだな。ノートに書いておく。",
+		"音で追い払った。消耗なし。割に合う。",
+		"追い払えなかった。多少の損害が出た。"))
+	var tablet := _merc_event(&"m6_tablet",
+		"石板だ。金になる。重い。…[kw:glow_text]ランプを近づけたら、文字が淡く光った[/kw]が、読めん。報酬になるか、判断を。",
+		&"explore", 14, {&"glow_text": &"tablet_light"},
+		"灯りで文字が浮かぶ…ノートに書いておく。浮かんだ文字を調べさせよう。",
+		"浮かんだ文字を写させた。隠し部屋の場所だ。……金になる。",
+		"読み取れなかった。時間の無駄だったな。")
+	list.append(tablet)
 	return list
 
 

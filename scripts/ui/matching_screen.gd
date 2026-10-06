@@ -596,8 +596,9 @@ func _show_summary() -> void:
 	if not state.learned.is_empty():
 		var learned_label := Label.new()
 		var texts: Array[String] = []
+		var spots := SampleData.growth_spots()
 		for id in state.learned:
-			texts.append("「%s」" % state.fill_texts.get(id, "?"))
+			texts.append(str(spots.get(id, "?")))
 		learned_label.text = "ノートに書けたこと: " + "、".join(texts)
 		learned_label.add_theme_color_override("font_color", Palette.OK)
 		vbox.add_child(learned_label)

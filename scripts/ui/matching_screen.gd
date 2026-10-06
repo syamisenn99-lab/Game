@@ -34,6 +34,9 @@ var _line_label: Label
 var _dice_label: Label
 var _next_button: Button
 var _overlay: Control
+var _cmd_panel: PanelContainer
+var _cmd_pulse: Tween
+var _cmd_hint_active := false
 
 
 func _ready() -> void:
@@ -152,6 +155,7 @@ func _build_ui() -> void:
 
 	# 下部: 指示パネル
 	var bottom := PanelContainer.new()
+	_cmd_panel = bottom
 	bottom.add_theme_stylebox_override("panel", Palette.box(Palette.PAPER, Palette.INK_FAINT, 2, 6, 12.0))
 	root.add_child(bottom)
 	var bvbox := VBoxContainer.new()
@@ -231,6 +235,7 @@ func _start_next_event() -> void:
 		return
 	_phase = Phase.REPORTING
 	_selected_chip = null
+	_set_command_hint(false)
 	for view: NoteEntryView in _entry_views.values():
 		view.show_stamp(false)
 	_build_report()
@@ -311,6 +316,28 @@ func _update_timer_ui() -> void:
 	_timer_bar.modulate = Color(1.0, 0.55, 0.5) if low else Color.WHITE
 
 
+## 照合に成功したあと、「次は下の指示を選ぶ」と分かるように、指示パネルを光らせる（文字は出さない）
+func _set_command_hint(active: bool) -> void:
+	if _cmd_pulse != null:
+		_cmd_pulse.kill()
+		_cmd_pulse = null
+	_cmd_hint_active = active
+	if active:
+		var sb := Palette.box(Palette.PAPER, Color("e0a800"), 4, 6, 12.0)
+		sb.shadow_color = Color(1.0, 0.85, 0.2, 0.85)
+		sb.shadow_size = 6
+		_cmd_panel.add_theme_stylebox_override("panel", sb)
+		_cmd_pulse = create_tween().set_loops()
+		_cmd_pulse.tween_property(sb, "shadow_size", 20, 0.55).set_trans(Tween.TRANS_SINE)
+		_cmd_pulse.tween_property(sb, "shadow_size", 6, 0.55).set_trans(Tween.TRANS_SINE)
+		for button: Button in _stat_buttons.values():
+			button.add_theme_stylebox_override("normal", Palette.box(Palette.INK, Color("e0a800"), 3, 6, 8.0))
+	else:
+		_cmd_panel.add_theme_stylebox_override("panel", Palette.box(Palette.PAPER, Palette.INK_FAINT, 2, 6, 12.0))
+		for button: Button in _stat_buttons.values():
+			button.remove_theme_stylebox_override("normal")
+
+
 func _set_stat_buttons_enabled(value: bool) -> void:
 	for button: Button in _stat_buttons.values():
 		button.disabled = not value
@@ -368,6 +395,7 @@ func _on_keyword_dropped(keyword_id: StringName, target_id: StringName) -> void:
 			Effects.burst(_overlay, at, Palette.HILITE_BG, 32)
 			Effects.burst(_overlay, at, Palette.OK, 14)
 			Effects.float_text(_overlay, "照合！", at + Vector2(0, -24), Palette.OK)
+			_set_command_hint(true)
 		MatchingState.DropResult.MISMATCH:
 			_line_label.text = "うーん、ここじゃない気がする…（時間が %.1f 秒減った）" % Rules.MISMATCH_PENALTY_SEC
 			var at := get_global_mouse_position()
@@ -396,6 +424,7 @@ func _resolve(chosen: StringName) -> void:
 	if _phase != Phase.REPORTING:
 		return
 	_phase = Phase.ROLLING
+	_set_command_hint(false)
 	_reveal_all()
 	_deselect_chip()
 	for chip in _chips:

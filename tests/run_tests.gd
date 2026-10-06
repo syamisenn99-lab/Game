@@ -179,10 +179,14 @@ func _test_effects() -> void:
 	_check(screen._overlay.get_child_count() > 0, "fx: mismatch spawns effects")
 	_check(absf(wrong.rotation) > 0.0, "fx: mismatch wobbles the entry")
 	var good: NoteEntryView = screen._entry_views[&"mushroom_poison"]
+	_check(not screen._cmd_hint_active, "fx: command panel is not lit before a match")
 	screen._on_keyword_dropped(&"mushroom", &"mushroom_poison")
 	await _frames(3)
+	_check(screen._cmd_hint_active, "fx: command panel lights up after a match")
 	_check(good._stamp.scale.x > 1.0, "fx: stamp slams in (scale %.2f)" % good._stamp.scale.x)
 	_check(good.scale.x > 1.0, "fx: entry pops (scale %.2f)" % good.scale.x)
+	screen._on_stat_chosen(&"evade")
+	_check(not screen._cmd_hint_active, "fx: command panel stops lighting once a command is chosen")
 	await create_timer(1.8).timeout
 	_check(screen._overlay.get_child_count() == 0, "fx: effects are cleaned up (%d left)" % screen._overlay.get_child_count())
 	_check(is_zero_approx(wrong.rotation) and is_equal_approx(good.scale.x, 1.0), "fx: entries return to rest")

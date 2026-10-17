@@ -1,0 +1,8 @@
+{
+  "items": {
+    "dried_meat":   { "name": "干し肉", "type": "food", "description": "保存のきく干し肉。" },
+    "herb":         { "name": "薬草", "type": "material", "description": "傷薬の材料になる、ありふれた薬草。" },
+    "intro_letter": { "name": "村長の紹介状", "type": "key", "description": "ハーネ村の村長が書いてくれた紹介状。" },
+    "empty_bottle": { "name": "空の硝子瓶", "type": "material", "description": "薬を作るときに使う、透き通った小瓶。" }
+  }
+}

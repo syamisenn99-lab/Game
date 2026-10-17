@@ -1,0 +1,25 @@
+{
+  "characters": {
+    "kazuki": {
+      "name": "カズキ", "color": "#6f8fb5", "party": true,
+      "level": 1, "hp": 30, "mp": 5,
+      "stats": { "力": 6, "体力": 6, "敏捷": 5, "知力": 4, "魔力": 2, "器用": 5, "運": 5 },
+      "skills": { "剣術": 1, "狩猟": 1 },
+      "equipment": { "武器": "古い鉄の片手剣", "胴": "旅人の服", "脚": "革のブーツ" }
+    },
+    "ayaka": {
+      "name": "アヤカ", "color": "#a9b58f", "party": true, "heroine": true, "affinity": 45,
+      "level": 1, "hp": 20, "mp": 20,
+      "stats": { "力": 3, "体力": 4, "敏捷": 7, "知力": 8, "魔力": 7, "器用": 6, "運": 5 },
+      "skills": { "薬草学": 2, "風魔法": 1, "治癒魔法": 1 },
+      "equipment": { "武器": "樫の木の杖", "胴": "旅人のローブ" }
+    },
+    "gorm":   { "name": "ゴルム", "color": "#b08d57" },
+    "baldo":  { "name": "バルド", "color": "#7d8794" },
+    "ruu":    { "name": "ルゥ", "color": "#b5835a", "heroine": true, "affinity": 3 },
+    "ryui":   { "name": "リュイ", "color": "#b5483f", "heroine": true, "affinity": 0 },
+    "celes":  { "name": "セレス", "color": "#b9c4d6", "heroine": true, "affinity": 0 },
+    "bridget": { "name": "ブリジット", "color": "#c46a3a", "heroine": true, "affinity": 0 },
+    "dora":   { "name": "ドーラ", "color": "#8a6a4f" }
+  }
+}

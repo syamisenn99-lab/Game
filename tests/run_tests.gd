@@ -805,8 +805,21 @@ func _test_relic() -> void:
 	filled[&"cube_memory"] = true
 	_check(SampleData.relic_event(SampleData.CHILDHOOD, filled) == null, "relic: two fragments are not enough")
 	filled[&"cube_voice"] = true
+	_check(SampleData.relic_event(SampleData.CHILDHOOD, filled) == null, "relic: three fragments are not enough while the witnesses disagree")
+	# 食い違い: 傭兵が「冷たい」と書かれたあと、医師の2つ目の報告で、「誰が触れても同じ」を訂正する
+	var contradiction := SampleData.relic_event(SampleData.DOCTOR, filled)
+	_check(contradiction != null and contradiction.id == &"r_doctor2" and contradiction.keyword_targets.values().has(&"cube_same"), "relic: the doctor reports a second, contradicting account")
+	_check(SampleData.relic_event(SampleData.DOCTOR, {}).id == &"r_doctor", "relic: the contradiction needs the mercenary's account first")
+	var cube_entry: NoteEntry = SampleData.entries().filter(func(e: NoteEntry) -> bool: return e.id == &"black_cube")[0]
+	_check(cube_entry.fix_olds.has(&"cube_same") and cube_entry.blank_fills.has(&"cube_same"), "relic: the note holds a wrong statement to correct")
+	var cstate := MatchingState.new(SampleData.adventurer(SampleData.DOCTOR), [contradiction], SampleData.entries(), filled.duplicate())
+	cstate.begin_next_event()
+	_check(cstate.is_fix(&"cube_same") and not cstate.matched, "relic: the wrong statement starts unmatched")
+	_check(cstate.drop(&"r_warm", &"cube_same") == MatchingState.DropResult.MATCHED and cstate.filled_blanks.has(&"cube_same"), "relic: the account corrects the note")
+	filled[&"cube_same"] = true
+	_check(SampleData.relic_event(SampleData.DOCTOR, filled) == null, "relic: the contradiction is settled once")
 	var finale := SampleData.relic_event(SampleData.CHILDHOOD, filled)
-	_check(finale != null and finale.keyword_targets.values().has(&"cube_truth"), "relic: three fragments unlock the deduction")
+	_check(finale != null and finale.keyword_targets.values().has(&"cube_truth"), "relic: four fragments unlock the deduction")
 	filled[&"cube_truth"] = true
 	_check(SampleData.relic_event(SampleData.CHILDHOOD, filled) == null, "relic: the deduction is reported once")
 	# 3人の報告は、それぞれ別の断片を指す
@@ -816,7 +829,7 @@ func _test_relic() -> void:
 			targets[t] = true
 	_check(targets.size() == 3, "relic: the three reports point to three different fragments (%d)" % targets.size())
 	var cube := SampleData.entries().filter(func(e: NoteEntry) -> bool: return e.id == &"black_cube")
-	_check(cube.size() == 1 and cube[0].blank_fills.size() == 3 and cube[0].page == &"relics", "relic: the note page has three blanks")
+	_check(cube.size() == 1 and cube[0].blank_fills.size() == 4 and cube[0].page == &"relics", "relic: the note page has four spots")
 	_check(Illustrations.find("sketches", &"cube", SampleData.MERCENARY) != null, "relic: the cube has a sketch")
 
 
@@ -1046,7 +1059,7 @@ func _test_carry_over() -> void:
 	_check(second.current.id == &"m2_beast" and second.auto_matched and second.auto_target == &"beast_aversion", "carry: the mercenary's beast event starts pre-matched")
 	_check(second.drop(&"torch", &"beast_aversion") == MatchingState.DropResult.IGNORED, "carry: no double matching")
 	_check(second.learned.is_empty(), "carry: nothing new is learned the second time")
-	_check(SampleData.growth_spots().size() == 12, "carry: the note has twelve spots that can grow (%d)" % SampleData.growth_spots().size())
+	_check(SampleData.growth_spots().size() == 13, "carry: the note has thirteen spots that can grow (%d)" % SampleData.growth_spots().size())
 	# 引数を省略した状態は、互いに共有されない
 	var a := MatchingState.new(SampleData.adventurer(), SampleData.events(), SampleData.entries())
 	var b := MatchingState.new(SampleData.adventurer(), SampleData.events(), SampleData.entries())
@@ -1101,16 +1114,16 @@ func _test_carry_over_ui() -> void:
 	var start: PrepScreen = load("res://scenes/prep_screen.tscn").instantiate()
 	root.add_child(start)
 	await _frames(3)
-	_check(start.notebook_label.text.contains("0 / 12"), "carry ui: the prep screen shows no growth at first (%s)" % start.notebook_label.text)
+	_check(start.notebook_label.text.contains("0 / 13"), "carry ui: the prep screen shows no growth at first (%s)" % start.notebook_label.text)
 	GameSession.filled_blanks[&"beast_aversion"] = true
 	GameSession.funds = 50
 	start._refresh()
-	_check(start.notebook_label.text.contains("1 / 12") and start.notebook_label.text.contains("火"), "carry ui: the prep screen shows what has been written (%s)" % start.notebook_label.text)
+	_check(start.notebook_label.text.contains("1 / 13") and start.notebook_label.text.contains("火"), "carry ui: the prep screen shows what has been written (%s)" % start.notebook_label.text)
 	_check(start.warning_label.text.contains("生活費"), "carry ui: low funds trigger a warning")
 	start.request_reset()
 	_check(GameSession.filled_blanks.has(&"beast_aversion") and GameSession.funds == 50, "carry ui: the first press only asks for confirmation")
 	start.request_reset()
-	_check(GameSession.filled_blanks.is_empty() and GameSession.funds == Rules.START_FUNDS and start.notebook_label.text.contains("0 / 12"), "carry ui: the second press resets everything")
+	_check(GameSession.filled_blanks.is_empty() and GameSession.funds == Rules.START_FUNDS and start.notebook_label.text.contains("0 / 13"), "carry ui: the second press resets everything")
 	start.queue_free()
 	await _frames(2)
 	_reset_session()

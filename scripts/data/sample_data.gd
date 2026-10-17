@@ -86,11 +86,14 @@ static func entries() -> Array[NoteEntry]:
 		"文字が刻まれた石板は、古代の記録。{blank:tablet_light}を近づけると文字が浮かぶ。浮かんだ文字を調べれば、隠し部屋の場所が分かることがある。持ち帰れば高く売れるが、とても重い。",
 		{&"tablet_light": "灯り"}, 0))
 	# 謎の遺物: 冒険者ごとに、別の面だけを報告する。3つの断片がそろうと、正体を推理できる
-	list.append(_entry(&"black_cube", &"relics", "黒い立方体（第4層・調査中）",
-		"床の中央に置かれた、黒い立方体。表面は{blank:cube_cold}。触れた者は、{blank:cube_memory}らしい。近づくと、{blank:cube_voice}という。",
-		{&"cube_cold": "霜のつかない氷のように冷たい", &"cube_memory": "直前の記憶が曖昧になる", &"cube_voice": "聞き覚えのある声がする"}, 0))
+	var cube := _entry(&"black_cube", &"relics", "黒い立方体（第4層・調査中）",
+		"床の中央に置かれた、黒い立方体。表面は{blank:cube_cold}。触れた者は、{blank:cube_memory}らしい。近づくと、{blank:cube_voice}という。触れた感触は、{fix:cube_same}。",
+		{&"cube_cold": "霜のつかない氷のように冷たい", &"cube_memory": "直前の記憶が曖昧になる", &"cube_voice": "聞き覚えのある声がする",
+		&"cube_same": "触れる人によって違う"}, 0)
+	cube.fix_olds = {&"cube_same": "誰が触れても同じ（冷たい）"}
+	list.append(cube)
 	list.append(_entry(&"cube_truth_note", &"relics", "立方体の正体（推理）",
-		"冷たさ、記憶、声。三つの断片が重なるなら、あの立方体は、{blank:cube_truth}ではないか。",
+		"冷たさ、記憶、声。そして、人によって違う感触。四つの断片が重なるなら、あの立方体は、{blank:cube_truth}ではないか。",
 		{&"cube_truth": "人の記憶を預かる「器」"}, 0))
 	return list
 
@@ -427,6 +430,14 @@ static func relic_event(adventurer_id: StringName, filled: Dictionary) -> EventD
 			"冷たいのに霜が付かない…それだけ、ノートに書いておく。",
 			"手を引いた。それ以上は触っていない。……耳鳴りだけが、しばらく残った。",
 			"不用意に触れすぎた。手が痺れて、荷を少し落とした。")
+	elif adventurer_id == DOCTOR and filled.has(&"cube_cold") and filled.has(&"cube_memory") and not filled.has(&"cube_same"):
+		# 食い違い: 傭兵は「冷たい」と言った。同じ箱に触れた医師の同行者は、「温かい」と言う
+		ev = _timed(_event(&"r_doctor2",
+			"あの、あの箱のことで、おかしなことがあるんです！ 私は、確かに[kw:r_my_cold]氷みたいに冷たい[/kw]と感じたのに、同行者は[kw:r_warm]「まるで人肌のように温かい」[/kw]と言うんです！ 嘘をついているようには、とても…二人とも同じ場所を、同じ手で、触れたのに…どちらが、正しいんでしょうか？",
+			&"explore", 14, {&"r_warm": &"cube_same"},
+			"傭兵は冷たいと言ったのに、同行者は温かいと言った…ノートの「誰が触れても同じ」は、間違っているんだ。直しておくね。",
+			"二人を箱から離しました。…どちらも、嘘は言っていなかったんだと思います。あの箱は、触れる人ごとに、違う何かを返している…。",
+			"混乱して、箱に近づきすぎてしまいました…荷物が、少し。"), 15.0)
 	elif adventurer_id == DOCTOR and not filled.has(&"cube_memory"):
 		ev = _timed(_event(&"r_doctor",
 			"あの、あの黒い箱に、同行者が触れたんです！ 脈は正常、瞳孔も普通、でも…[kw:r_memory]触れる直前の数分の出来事を、彼は思い出せない[/kw]んです！ 外傷はありません、でも、でも、[kw:r_pulse]脈が一瞬だけ止まった[/kw]ような気がして…どうすれば！",
@@ -442,7 +453,7 @@ static func relic_event(adventurer_id: StringName, filled: Dictionary) -> EventD
 			"後ずさると、声は遠のいた。…あれは、遺物が人の何かを、映しているのだろうか。",
 			"声に引き寄せられ、つい手を伸ばしてしまった…少し、荷物を落としたようだ。"), 30.0)
 	elif adventurer_id == CHILDHOOD and not filled.has(&"cube_truth") \
-			and filled.has(&"cube_cold") and filled.has(&"cube_memory") and filled.has(&"cube_voice"):
+			and filled.has(&"cube_cold") and filled.has(&"cube_memory") and filled.has(&"cube_voice") and filled.has(&"cube_same"):
 		ev = _timed(_event(&"r_child",
 			"あのね、前に三人が見た黒い箱を、私も見つけたの。[kw:r_floor]床の模様が、箱を囲むように広がってる[/kw]。それで、[kw:r_truth]箱の中から、姉さんの声がして、私、昨日の晩ごはんを思い出せなくなったの。すごく、冷たい空気の中で[/kw]……ねえ、これって、何なの？",
 			&"explore", 13, {&"r_truth": &"cube_truth"},
@@ -511,7 +522,7 @@ const SKETCHES := {
 	&"m5_bats_again": &"bat", &"m6_tablet": &"tablet",
 	&"f1_mushroom": &"mushroom", &"f2_beast": &"beast", &"f3_moss": &"moss",
 	&"d1_rash": &"mushroom", &"d2_herb": &"herb", &"d3_numb": &"moss", &"d4_bats_high": &"bat",
-	&"r_merc": &"cube", &"r_doctor": &"cube", &"r_noble": &"cube", &"r_child": &"cube",
+	&"r_merc": &"cube", &"r_doctor": &"cube", &"r_doctor2": &"cube", &"r_noble": &"cube", &"r_child": &"cube",
 	&"n1_pattern": &"pattern", &"n2_tablet": &"tablet", &"n3_statue": &"statue", &"n4_keyhole": &"keyhole",
 }
 

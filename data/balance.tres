@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="BalanceConfig" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/balance_config.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+max_hp = 60
+energy_per_turn = 3
+draw_per_turn = 5
+hand_limit = 10
+fatigue_start_reshuffle = 3
+min_draw = 2

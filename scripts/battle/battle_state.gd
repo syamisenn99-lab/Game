@@ -5,6 +5,8 @@ extends RefCounted
 signal changed
 signal log_added(text: String)
 signal finished(won: bool)
+## 記憶が発動した（画面で光らせる用）
+signal memory_triggered(memory: MemoryInstance)
 
 enum Phase { PLAYER_TURN, ENEMY_TURN, WON, LOST }
 
@@ -25,10 +27,22 @@ var hand: Array[CardInstance] = []
 var reshuffle_count: int = 0
 var fatigue: int = 0
 
+## ラン全体から受け取るもの
+var memories: Array[MemoryInstance] = []
+var released_count: int = 0
 
-func _init(p_balance: BalanceConfig, encounter: EncounterData, deck: Array[CardInstance], p_rng: RandomNumberGenerator, start_hp: int = -1) -> void:
+## 今使っているカードにだけ上乗せする攻撃ダメージ（記憶「研ぎ澄まし」）
+var attack_bonus: int = 0
+var cards_played: int = 0
+var _plays_this_turn: Dictionary = {}  # CardType -> 枚数
+
+
+func _init(p_balance: BalanceConfig, encounter: EncounterData, deck: Array[CardInstance], p_rng: RandomNumberGenerator,
+		start_hp: int = -1, p_memories: Array[MemoryInstance] = [], p_released_count: int = 0) -> void:
 	balance = p_balance
 	rng = p_rng
+	memories = p_memories
+	released_count = p_released_count
 	player.display_name = "あなた"
 	player.max_hp = balance.max_hp
 	player.hp = player.max_hp if start_hp < 0 else start_hp
@@ -95,6 +109,13 @@ func resolve_targets(source: Combatant, target: EffectData.Target, chosen: Comba
 				var alive := living_enemies()
 				if not alive.is_empty():
 					result.append(alive[0])
+		EffectData.Target.RANDOM_OPPONENT:
+			if not from_player:
+				result.append(player)
+			else:
+				var alive := living_enemies()
+				if not alive.is_empty():
+					result.append(alive[rng.randi_range(0, alive.size() - 1)])
 		EffectData.Target.ALL_OPPONENTS:
 			if from_player:
 				for e in living_enemies():
@@ -111,11 +132,17 @@ func play_card(card: CardInstance, chosen: BattleEnemy = null) -> bool:
 		return false
 	hand.erase(card)
 	energy -= card.data.cost
+	cards_played += 1
 	add_log("「%s」を使った（残りエネルギー%d）" % [card.data.display_name, energy])
+	var type_key := int(card.data.card_type)
+	_plays_this_turn[type_key] = int(_plays_this_turn.get(type_key, 0)) + 1
+	attack_bonus = 0
+	_fire_memories(MemoryData.Timing.CARD_PLAYED, card)
 	for e in card.data.effects:
 		if phase != Phase.PLAYER_TURN:
 			break
 		e.apply(self, player, chosen, card)
+	attack_bonus = 0
 	card.omoide = mini(card.omoide + 1, balance.omoide_max)
 	discard_pile.append(card)
 	changed.emit()
@@ -134,6 +161,9 @@ func end_turn() -> void:
 			discard_pile.append(c)
 	hand = kept
 	add_log("ターン終了")
+	for m in memories:
+		if m.sealed_turns > 0:
+			m.sealed_turns -= 1
 	_end_of_turn_tick(player)
 	if _terminal():
 		return
@@ -211,7 +241,51 @@ func debug_add_to_hand(data: CardData) -> void:
 	changed.emit()
 
 
+## ランダムな記憶を数ターン封印する（敵の行動用）
+func seal_random_memory(turns: int) -> void:
+	var candidates: Array[MemoryInstance] = []
+	for m in memories:
+		if m.sealed_turns <= 0:
+			candidates.append(m)
+	if candidates.is_empty():
+		add_log("封印できる記憶がなかった")
+		return
+	var target := candidates[rng.randi_range(0, candidates.size() - 1)]
+	target.sealed_turns = turns
+	add_log("記憶「%s」が%dターン封印された" % [target.data.display_name, turns])
+
+
 # ---------- 内部処理 ----------
+
+## 指定のタイミングの記憶を、持っている順に発動する
+func _fire_memories(timing: MemoryData.Timing, card: CardInstance = null) -> void:
+	for m in memories:
+		if _terminal_for_memories(timing):
+			return
+		if m.data.timing != timing or m.sealed_turns > 0:
+			continue
+		if timing == MemoryData.Timing.CARD_PLAYED:
+			var type_key := int(card.data.card_type)
+			if not m.data.matches_card(card, int(_plays_this_turn.get(type_key, 0))):
+				continue
+		var value := m.data.values[m.tier]
+		if value <= 0:
+			continue
+		add_log("記憶「%s」（%s）が発動：%s" % [m.data.display_name, m.tier_label(), m.data.describe(m.tier)])
+		memory_triggered.emit(m)
+		for template in m.data.effects:
+			var e: EffectData = template.duplicate()
+			if e.memory_scaled:
+				e.set_value(value)
+			e.apply(self, player, null, null)
+
+
+func _terminal_for_memories(timing: MemoryData.Timing) -> bool:
+	# 戦闘勝利時の記憶は、勝った後に発動するので止めない
+	if timing == MemoryData.Timing.BATTLE_WIN:
+		return phase == Phase.LOST
+	return phase == Phase.WON or phase == Phase.LOST
+
 
 func _spawn_enemies(encounter: EncounterData) -> void:
 	var counts := {}
@@ -234,9 +308,14 @@ func _start_player_turn() -> void:
 	phase = Phase.PLAYER_TURN
 	player.block = 0
 	energy = balance.energy_per_turn
+	_plays_this_turn.clear()
+	attack_bonus = 0
 	var count := next_draw_count()
 	add_log("--- %dターン目 --- カードを%d枚引く" % [turn, count])
 	draw_cards(count)
+	if turn == 1:
+		_fire_memories(MemoryData.Timing.BATTLE_START)
+	_fire_memories(MemoryData.Timing.TURN_START)
 	changed.emit()
 
 
@@ -263,6 +342,7 @@ func _reshuffle() -> void:
 		add_log("捨て札をシャッフルした（%d回目）疲労が%dになった" % [reshuffle_count, fatigue])
 	else:
 		add_log("捨て札をシャッフルした（%d回目）" % reshuffle_count)
+	_fire_memories(MemoryData.Timing.RESHUFFLE)
 
 
 func _shuffle(cards: Array[CardInstance]) -> void:
@@ -314,6 +394,8 @@ func _finish(won: bool) -> void:
 	if phase == Phase.WON or phase == Phase.LOST:
 		return
 	phase = Phase.WON if won else Phase.LOST
+	if won:
+		_fire_memories(MemoryData.Timing.BATTLE_WIN)
 	add_log("勝利！" if won else "敗北…")
 	print("[Battle] %s ターン=%d プレイヤーHP=%d" % ["勝利" if won else "敗北", turn, player.hp])
 	changed.emit()

@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="ChapterData" load_steps=12 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/chapter_data.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/resources/encounter_data.gd" id="2"]
+[ext_resource type="Resource" path="res://data/encounters/silverfish.tres" id="4"]
+[ext_resource type="Resource" path="res://data/encounters/bats.tres" id="5"]
+[ext_resource type="Resource" path="res://data/encounters/frog.tres" id="6"]
+[ext_resource type="Resource" path="res://data/encounters/sentinel.tres" id="7"]
+[ext_resource type="Resource" path="res://data/encounters/shadow.tres" id="8"]
+[ext_resource type="Resource" path="res://data/encounters/silverfish_x2.tres" id="9"]
+[ext_resource type="Resource" path="res://data/encounters/frog_silverfish.tres" id="10"]
+[ext_resource type="Resource" path="res://data/encounters/librarian.tres" id="11"]
+
+[resource]
+script = ExtResource("1")
+early_encounters = Array[ExtResource("2")]([ExtResource("4"), ExtResource("5"), ExtResource("6")])
+mid_encounters = Array[ExtResource("2")]([ExtResource("7"), ExtResource("8"), ExtResource("9"), ExtResource("10")])
+boss_encounter = ExtResource("11")

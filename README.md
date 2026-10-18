@@ -42,7 +42,14 @@ godot --headless --path . --script tests/run_tests.gd    # 判定ロジック・
 ## 引き算デッキ（MVP開発中）
 
 同じフォルダで開発中の別ゲーム。仕様は [docs/SPEC.md](docs/SPEC.md)、開発ルールは [CLAUDE.md](CLAUDE.md)。
-F5で戦闘画面が始まる（メインシーンを `scenes/battle/battle.tscn` にしてある）。別ゲーム（安楽椅子冒険者）を動かすときは、`scenes/prep_screen.tscn` を開いて F6。
-テスト: `godot --headless --path . --script tests/battle_tests.gd`
+F5でタイトル画面から始まる（メインシーンは `scenes/title/title.tscn`）。別ゲーム（安楽椅子冒険者）を動かすときは、`scenes/prep_screen.tscn` を開いて F6。
 
-デバッグ（デバッグ実行時のみ）: F1 即勝利 / F3 パネル開閉（戦闘の選択・好きなカードを手札へ）/ F5 HP全快 / F6 同じシードで最初から。
+テスト（変更のたびに実行）:
+
+```sh
+godot --headless --path . --import                          # 初回のみ
+godot --headless --path . --script tests/battle_tests.gd    # 戦闘・記憶の計算
+godot --headless --path . --script tests/run_flow_tests.gd  # 初期デッキ・敵の並び・手放し・記憶の枠
+```
+
+デバッグ（デバッグ実行時のみ）: 戦闘画面で F1 即勝利 / F2 手放し画面へ / F3 パネル開閉（戦闘の選択・好きなカードを手札へ）/ F5 HP全快 / F6 同じシードで最初から。手放し画面で F4 選んだカードの思い出+5。

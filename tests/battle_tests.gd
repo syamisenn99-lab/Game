@@ -87,6 +87,11 @@ func _run() -> void:
 	_test_end_conditions()
 	_test_hand_limit_and_fatigue()
 	_test_seed_repro()
+	_test_memories_data()
+	_test_memory_battle_start()
+	_test_memory_turn_and_cards()
+	_test_memory_reshuffle_and_win()
+	_test_memory_seal()
 	print("テスト %d件中 %d件失敗" % [_checks, _failures])
 	quit(1 if _failures > 0 else 0)
 
@@ -467,3 +472,159 @@ func _test_seed_repro() -> void:
 	var ids_a: Array = a.hand.map(func(c: CardInstance) -> int: return c.uid)
 	var ids_b: Array = b.hand.map(func(c: CardInstance) -> int: return c.uid)
 	_eq(ids_a, ids_b, "同じシードなら同じ手札")
+
+
+# ---------- 記憶 ----------
+
+func _mem(id: String, tier: int) -> MemoryInstance:
+	return MemoryInstance.new(load("res://data/memories/%s.tres" % id) as MemoryData, tier, id)
+
+
+func _battle_with(encounter: String, mems: Array[MemoryInstance], released: int = 0, seed_value: int = 1) -> BattleState:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed_value
+	var b := BattleState.new(_balance(), load("res://data/encounters/%s.tres" % encounter) as EncounterData, _deck10(), rng, -1, mems, released)
+	b.start()
+	return b
+
+
+func _test_memories_data() -> void:
+	for id in CARD_IDS:
+		var c := _card(id)
+		_check(c.memory != null, "%s に記憶がある" % id)
+		_eq(c.memory.values.size(), 3, "%s の記憶は3段階" % id)
+	_eq(_card("strike").memory.describe(), "戦闘開始時、ランダムな敵に2／4／7ダメージ", "記憶の説明（3段階）")
+	_eq(_card("strike").memory.describe(1), "戦闘開始時、ランダムな敵に4ダメージ", "記憶の説明（確かな）")
+	_eq(_card("farewell").memory.describe(2), "戦闘開始時、これまでに手放した枚数×3のダメージを敵全体に", "決別の説明")
+	_eq(_card("stargazing").memory.describe(0), "戦闘開始時にエネルギー1を得て、1枚引く", "導きの説明")
+	_eq(MemoryData.TIER_LABELS, ["淡い", "確かな", "鮮明な"] as Array[String], "段階の名前")
+
+
+func _test_memory_battle_start() -> void:
+	# 最初の一撃：ランダムな敵に2/4/7
+	for t in 3:
+		var b := _battle_with("silverfish", [_mem("first_strike", t)] as Array[MemoryInstance])
+		_eq(b.enemies[0].hp, 22 - [2, 4, 7][t], "最初の一撃 段階%d" % t)
+	# 蝙蝠3体のうち1体だけに当たる
+	var b3 := _battle_with("bats", [_mem("first_strike", 2)] as Array[MemoryInstance])
+	var damaged := 0
+	for e in b3.enemies:
+		if e.hp < 10:
+			damaged += 1
+	_eq(damaged, 1, "ランダムな敵1体だけに当たる")
+	# 間合い：敵全体に弱体
+	var b := _battle_with("bats", [_mem("reach", 1)] as Array[MemoryInstance])
+	for e in b.enemies:
+		_eq(e.stacks(Status.WEAK), 2, "間合い：全員に弱体2")
+	# 重み：筋力
+	b = _battle_with("silverfish", [_mem("weight", 2)] as Array[MemoryInstance])
+	_eq(b.player.stacks(Status.STRENGTH), 3, "重み：筋力3")
+	# 残り香：敵全体に毒
+	b = _battle_with("bats", [_mem("lingering", 2)] as Array[MemoryInstance])
+	_eq(b.enemies[1].stacks(Status.POISON), 4, "残り香：毒4")
+	# 落ち着き：追加で引く
+	b = _battle_with("silverfish", [_mem("calm", 2)] as Array[MemoryInstance])
+	_eq(b.hand.size(), 8, "落ち着き：5+3枚")
+	# 導き：エネルギー1と1/2/3枚
+	b = _battle_with("silverfish", [_mem("guidance", 1)] as Array[MemoryInstance])
+	_eq(b.energy, 4, "導き：エネルギー+1")
+	_eq(b.hand.size(), 7, "導き：5+2枚")
+	# 決別：手放した枚数×1/2/3
+	b = _battle_with("silverfish", [_mem("parting", 2)] as Array[MemoryInstance], 4)
+	_eq(b.enemies[0].hp, 22 - 12, "決別：4枚×3=12ダメージ")
+	b = _battle_with("silverfish", [_mem("parting", 0)] as Array[MemoryInstance], 0)
+	_eq(b.enemies[0].hp, 22, "決別：手放した枚数0なら何も起きない")
+	# 戦闘開始時の記憶は最初のターンだけ
+	b = _battle_with("silverfish", [_mem("weight", 0)] as Array[MemoryInstance])
+	b.end_turn()
+	_eq(b.player.stacks(Status.STRENGTH), 1, "戦闘開始時の記憶は2ターン目には発動しない")
+
+
+func _test_memory_turn_and_cards() -> void:
+	# 構え：ターン開始時にブロック（ブロックはその時点で0に戻った後）
+	var b := _battle_with("silverfish", [_mem("stance", 2)] as Array[MemoryInstance])
+	_eq(b.player.block, 4, "構え：1ターン目のブロック4")
+	b.end_turn()
+	_eq(b.player.block, 4, "構え：2ターン目も4（持ち越さず毎回）")
+	# 手数：1ターンに3枚目の攻撃カードで敵全体に
+	b = _battle_with("bats", [_mem("tempo", 2)] as Array[MemoryInstance])
+	var cs := _with_hand(b, ["strike", "strike", "strike", "strike"])
+	b.play_card(cs[0], b.enemies[0])
+	b.play_card(cs[1], b.enemies[0])
+	_eq(b.enemies[2].hp, 10, "手数：2枚目まではまだ発動しない")
+	b.play_card(cs[2], b.enemies[1])
+	_eq(b.enemies[2].hp, 10 - 3, "手数：3枚目で敵全体に3ダメージ")
+	b.play_card(cs[3], b.enemies[1])
+	_eq(b.enemies[2].hp, 10 - 3, "手数：4枚目では発動しない")
+	# スキルカードは数えない
+	b = _battle_with("bats", [_mem("tempo", 2)] as Array[MemoryInstance])
+	cs = _with_hand(b, ["defend", "strike", "defend", "strike", "strike"])
+	for c in cs:
+		b.play_card(c, b.enemies[0])
+	_eq(b.enemies[2].hp, 10 - 3, "手数：攻撃だけ数えて3枚目で発動")
+	# 研ぎ澄まし：その攻撃に+0/1/2ダメージ
+	for t in 3:
+		b = _battle_with("silverfish", [_mem("honing", t)] as Array[MemoryInstance])
+		_play(b, "strike")
+		_eq(b.enemies[0].hp, 22 - 6 - t, "研ぎ澄まし 段階%d" % t)
+	b = _battle_with("silverfish", [_mem("honing", 2)] as Array[MemoryInstance])
+	_play(b, "defend")
+	_eq(b.enemies[0].hp, 22, "研ぎ澄まし：スキルでは発動しない")
+	_play(b, "double_thrust")
+	_eq(b.enemies[0].hp, 22 - 10, "研ぎ澄まし：二連突きは2回とも+2（5×2）")
+	_play(b, "strike")
+	_eq(b.enemies[0].hp, 22 - 10 - 8, "研ぎ澄まし：上乗せは次の攻撃に持ち越されない")
+
+
+func _test_memory_reshuffle_and_win() -> void:
+	# 軽やかさ：リシャッフル時にブロック
+	var b := _battle_with("silverfish", [_mem("lightness", 2)] as Array[MemoryInstance], 0, 3)
+	b.player.hp = 99999
+	b.player.max_hp = 99999
+	var seen_block := false
+	for i in 6:
+		b.end_turn()
+		if b.reshuffle_count > 0 and b.player.block >= 8:
+			seen_block = true
+			break
+	_check(seen_block, "軽やかさ：リシャッフルでブロック8")
+	# 温もり：戦闘勝利時にHP回復（上限まで）
+	b = _battle_with("silverfish", [_mem("warmth", 2)] as Array[MemoryInstance])
+	b.player.hp = 30
+	b.enemies[0].hp = 1
+	_play(b, "strike")
+	_eq(b.phase, BattleState.Phase.WON, "勝利")
+	_eq(b.player.hp, 36, "温もり：勝利時にHP+6")
+	b = _battle_with("silverfish", [_mem("warmth", 2)] as Array[MemoryInstance])
+	b.player.hp = 58
+	b.enemies[0].hp = 1
+	_play(b, "strike")
+	_eq(b.player.hp, 60, "温もり：最大HPを超えない")
+	# 負けたときは発動しない
+	b = _battle_with("silverfish", [_mem("warmth", 2)] as Array[MemoryInstance])
+	b.player.hp = 3
+	b.end_turn()
+	_eq(b.player.hp, 0, "敗北時は温もりが発動しない")
+
+
+func _test_memory_seal() -> void:
+	var mems: Array[MemoryInstance] = [_mem("stance", 2)]
+	var b := _battle_with("silverfish", mems)
+	_eq(b.player.block, 4, "封印前：構えが発動")
+	b.seal_random_memory(2)
+	_eq(mems[0].sealed_turns, 2, "記憶が2ターン封印された")
+	b.end_turn()  # 封印中のターン開始 → 構えは発動しない
+	_eq(b.player.block, 0, "封印中：構えは発動しない")
+	_eq(mems[0].sealed_turns, 1, "ターン終了で残りが減る")
+	b.end_turn()
+	_eq(mems[0].sealed_turns, 0, "封印が解ける")
+	_eq(b.player.block, 4, "封印が解けて発動")
+	# 司書の1手目で本当に封印される
+	var lib_mems: Array[MemoryInstance] = [_mem("stance", 1), _mem("weight", 1)]
+	b = _battle_with("librarian", lib_mems)
+	b.end_turn()
+	var sealed := 0
+	for m in lib_mems:
+		if m.sealed_turns > 0:
+			sealed += 1
+	_eq(sealed, 1, "司書の禁書の一撃で記憶が1つ封印される")

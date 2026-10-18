@@ -24,3 +24,7 @@ func intent_text(_battle: BattleState, _source: Combatant) -> String:
 	if target == EffectData.Target.SELF:
 		return "%s+%d" % [Status.label(status), stacks]
 	return "%s%dを付与" % [Status.label(status), stacks]
+
+
+func set_value(value: int) -> void:
+	stacks = value

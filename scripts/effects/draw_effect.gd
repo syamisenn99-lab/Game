@@ -12,3 +12,7 @@ func apply(battle: BattleState, source: Combatant, _chosen: Combatant, _card: Ca
 
 func describe() -> String:
 	return "%d枚引く" % count
+
+
+func set_value(value: int) -> void:
+	count = value

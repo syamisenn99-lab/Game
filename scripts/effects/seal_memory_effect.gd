@@ -1,13 +1,12 @@
 class_name SealMemoryEffect
 extends EffectData
 ## ランダムな記憶を数ターン封印する（敵の行動用）。
-## 記憶はマイルストーン3で作るので、今は予告と記録だけ出す仮の実装。
 
 @export var turns: int = 2
 
 
 func apply(battle: BattleState, _source: Combatant, _chosen: Combatant, _card: CardInstance) -> void:
-	battle.add_log("記憶の封印は未実装（マイルストーン3で対応）")
+	battle.seal_random_memory(turns)
 
 
 func describe() -> String:

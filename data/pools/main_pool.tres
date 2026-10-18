@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="CardPool" load_steps=15 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/card_pool.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/resources/card_data.gd" id="2"]
+[ext_resource type="Resource" path="res://data/cards/strike.tres" id="3"]
+[ext_resource type="Resource" path="res://data/cards/defend.tres" id="4"]
+[ext_resource type="Resource" path="res://data/cards/old_cloak.tres" id="5"]
+[ext_resource type="Resource" path="res://data/cards/double_thrust.tres" id="6"]
+[ext_resource type="Resource" path="res://data/cards/sweep.tres" id="7"]
+[ext_resource type="Resource" path="res://data/cards/heavy_blow.tres" id="8"]
+[ext_resource type="Resource" path="res://data/cards/poison_vial.tres" id="9"]
+[ext_resource type="Resource" path="res://data/cards/deep_breath.tres" id="10"]
+[ext_resource type="Resource" path="res://data/cards/light_step.tres" id="11"]
+[ext_resource type="Resource" path="res://data/cards/whetstone.tres" id="12"]
+[ext_resource type="Resource" path="res://data/cards/stargazing.tres" id="13"]
+[ext_resource type="Resource" path="res://data/cards/farewell.tres" id="14"]
+
+[resource]
+script = ExtResource("1")
+cards = Array[ExtResource("2")]([ExtResource("3"), ExtResource("4"), ExtResource("5"), ExtResource("6"), ExtResource("7"), ExtResource("8"), ExtResource("9"), ExtResource("10"), ExtResource("11"), ExtResource("12"), ExtResource("13"), ExtResource("14")])
+guaranteed = Array[ExtResource("2")]([ExtResource("3"), ExtResource("4")])
+guaranteed_count = 4
+weight_basic = 50.0
+weight_common = 40.0
+weight_rare = 10.0

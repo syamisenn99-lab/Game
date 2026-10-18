@@ -15,3 +15,7 @@ func describe() -> String:
 
 func intent_text(_battle: BattleState, _source: Combatant) -> String:
 	return "防御 %d" % amount
+
+
+func set_value(value: int) -> void:
+	amount = value

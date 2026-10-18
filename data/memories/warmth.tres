@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="MemoryData" load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/memory_data.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/effects/heal_effect.gd" id="2"]
+[ext_resource type="Script" path="res://scripts/resources/effect_data.gd" id="3"]
+
+[sub_resource type="Resource" id="Resource_1"]
+script = ExtResource("2")
+amount = 0
+
+[resource]
+script = ExtResource("1")
+id = &"warmth"
+display_name = "温もり"
+timing = 4
+values = Array[int]([2, 4, 6])
+effects = Array[ExtResource("3")]([SubResource("Resource_1")])
+template = "戦闘勝利時にHPを{v}回復する"

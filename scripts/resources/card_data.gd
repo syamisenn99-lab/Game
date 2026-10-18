@@ -13,6 +13,8 @@ enum Rarity { BASIC, COMMON, RARE }
 @export var rarity: Rarity = Rarity.BASIC
 @export var effects: Array[EffectData] = []
 @export var keywords: Array[String] = []
+## 手放したときに変わる記憶
+@export var memory: MemoryData
 
 
 func needs_target() -> bool:

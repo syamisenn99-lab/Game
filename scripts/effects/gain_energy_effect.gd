@@ -12,3 +12,7 @@ func apply(battle: BattleState, source: Combatant, _chosen: Combatant, _card: Ca
 
 func describe() -> String:
 	return "エネルギー%dを得る" % amount
+
+
+func set_value(value: int) -> void:
+	amount = value

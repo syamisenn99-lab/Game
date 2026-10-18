@@ -129,6 +129,12 @@ func _build_ui() -> void:
 
 	_build_result()
 	_build_debug_panel()
+	if OS.is_debug_build():
+		var debug_button := Button.new()
+		debug_button.text = "デバッグ（敵の選択・カード追加）"
+		debug_button.position = Vector2(12, 34)
+		debug_button.pressed.connect(func() -> void: _debug_panel.visible = not _debug_panel.visible)
+		add_child(debug_button)
 
 
 func _build_result() -> void:

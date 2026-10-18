@@ -22,6 +22,7 @@ var _fatigue_info: Label
 var _hand_box: HBoxContainer
 var _end_button: Button
 var _log_label: RichTextLabel
+var _result_overlay: CenterContainer
 var _result_panel: PanelContainer
 var _result_label: Label
 
@@ -97,13 +98,14 @@ func _build_ui() -> void:
 	_end_button.pressed.connect(_on_end_turn)
 	add_child(_end_button)
 
-	# 結果
+	# 結果（画面全体を覆う中央寄せの枠の中に置く）
+	_result_overlay = CenterContainer.new()
+	_result_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_result_overlay.visible = false
+	add_child(_result_overlay)
 	_result_panel = PanelContainer.new()
-	_result_panel.set_anchors_preset(Control.PRESET_CENTER)
-	_result_panel.position = Vector2(440, 240)
 	_result_panel.custom_minimum_size = Vector2(400, 200)
-	_result_panel.visible = false
-	add_child(_result_panel)
+	_result_overlay.add_child(_result_panel)
 	var rbox := VBoxContainer.new()
 	rbox.alignment = BoxContainer.ALIGNMENT_CENTER
 	_result_panel.add_child(rbox)
@@ -139,7 +141,7 @@ func _start_battle(seed_value: int) -> void:
 	_battle.log_added.connect(_on_log)
 	_battle.finished.connect(_on_finished)
 	_log_label.clear()
-	_result_panel.visible = false
+	_result_overlay.visible = false
 	_seed_label.text = "シード: %d" % RunState.run_seed
 	_battle.start()
 
@@ -156,7 +158,7 @@ func _on_end_turn() -> void:
 func _on_finished(won: bool) -> void:
 	_refresh()
 	_result_label.text = "勝利！" if won else "敗北…"
-	_result_panel.visible = true
+	_result_overlay.visible = true
 
 
 func _refresh() -> void:

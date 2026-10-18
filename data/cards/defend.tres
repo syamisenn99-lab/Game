@@ -1,6 +1,12 @@
-[gd_resource type="Resource" script_class="CardData" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="CardData" load_steps=5 format=3]
 
 [ext_resource type="Script" path="res://scripts/resources/card_data.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/effects/block_effect.gd" id="2"]
+[ext_resource type="Script" path="res://scripts/resources/effect_data.gd" id="3"]
+
+[sub_resource type="Resource" id="Resource_1"]
+script = ExtResource("2")
+amount = 5
 
 [resource]
 script = ExtResource("1")
@@ -8,5 +14,6 @@ id = &"defend"
 display_name = "防御"
 cost = 1
 card_type = 1
-damage = 0
-block = 5
+rarity = 0
+effects = Array[ExtResource("3")]([SubResource("Resource_1")])
+keywords = Array[String]([])

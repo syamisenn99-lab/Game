@@ -44,3 +44,5 @@ godot --headless --path . --script tests/run_tests.gd    # 判定ロジック・
 同じフォルダで開発中の別ゲーム。仕様は [docs/SPEC.md](docs/SPEC.md)、開発ルールは [CLAUDE.md](CLAUDE.md)。
 F5で戦闘画面が始まる（メインシーンを `scenes/battle/battle.tscn` にしてある）。別ゲーム（安楽椅子冒険者）を動かすときは、`scenes/prep_screen.tscn` を開いて F6。
 テスト: `godot --headless --path . --script tests/battle_tests.gd`
+
+デバッグ（デバッグ実行時のみ）: F1 即勝利 / F3 パネル開閉（戦闘の選択・好きなカードを手札へ）/ F5 HP全快 / F6 同じシードで最初から。

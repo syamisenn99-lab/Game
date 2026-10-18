@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="CardData" load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/card_data.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/effects/damage_effect.gd" id="2"]
+[ext_resource type="Script" path="res://scripts/resources/effect_data.gd" id="3"]
+
+[sub_resource type="Resource" id="Resource_1"]
+script = ExtResource("2")
+amount = 8
+omoide_bonus_per = 2
+
+[resource]
+script = ExtResource("1")
+id = &"farewell"
+display_name = "決別の一閃"
+cost = 2
+card_type = 0
+rarity = 2
+effects = Array[ExtResource("3")]([SubResource("Resource_1")])
+keywords = Array[String]([])

@@ -1,25 +1,33 @@
-[gd_resource type="Resource" script_class="EnemyData" load_steps=5 format=3]
+[gd_resource type="Resource" script_class="EnemyData" load_steps=10 format=3]
 
 [ext_resource type="Script" path="res://scripts/resources/enemy_data.gd" id="1"]
 [ext_resource type="Script" path="res://scripts/resources/enemy_action.gd" id="2"]
+[ext_resource type="Script" path="res://scripts/effects/damage_effect.gd" id="3"]
+[ext_resource type="Script" path="res://scripts/resources/effect_data.gd" id="4"]
+[ext_resource type="Script" path="res://scripts/effects/discard_deck_top_effect.gd" id="5"]
 
-[sub_resource type="Resource" id="Resource_bite"]
+[sub_resource type="Resource" id="Resource_1"]
+script = ExtResource("3")
+amount = 6
+
+[sub_resource type="Resource" id="Resource_2"]
 script = ExtResource("2")
 label = "かじる"
-damage = 6
-block = 0
-discard_top = 0
+effects = Array[ExtResource("4")]([SubResource("Resource_1")])
 
-[sub_resource type="Resource" id="Resource_nibble"]
+[sub_resource type="Resource" id="Resource_3"]
+script = ExtResource("5")
+count = 1
+
+[sub_resource type="Resource" id="Resource_4"]
 script = ExtResource("2")
 label = "山札をかじる"
-damage = 0
-block = 0
-discard_top = 1
+effects = Array[ExtResource("4")]([SubResource("Resource_3")])
 
 [resource]
 script = ExtResource("1")
 id = &"silverfish"
 display_name = "紙魚"
 max_hp = 22
-actions = Array[ExtResource("2")]([SubResource("Resource_bite"), SubResource("Resource_nibble")])
+pattern = 0
+actions = Array[ExtResource("2")]([SubResource("Resource_2"), SubResource("Resource_4")])

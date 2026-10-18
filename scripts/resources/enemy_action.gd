@@ -1,20 +1,17 @@
 class_name EnemyAction
 extends Resource
-## 敵の1回の行動（予告に出る内容）。
+## 敵の1回の行動。効果の配列から予告の文を自動生成する。
 
 @export var label: String = ""
-@export var damage: int = 0
-@export var block: int = 0
-## 山札の上から捨て札へ送る枚数
-@export var discard_top: int = 0
+@export var effects: Array[EffectData] = []
+## 重み付きランダムの敵で使う重み
+@export var weight: float = 1.0
+## true なら、この行動までのカウントダウンを画面に出す
+@export var countdown: bool = false
 
 
-func describe() -> String:
+func intent_text(battle: BattleState, source: Combatant) -> String:
 	var parts: Array[String] = []
-	if damage > 0:
-		parts.append("攻撃 %d" % damage)
-	if block > 0:
-		parts.append("防御 %d" % block)
-	if discard_top > 0:
-		parts.append("山札を%d枚捨てさせる" % discard_top)
+	for e in effects:
+		parts.append(e.intent_text(battle, source))
 	return " + ".join(parts)

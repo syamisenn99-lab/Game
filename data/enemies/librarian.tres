@@ -1,0 +1,67 @@
+[gd_resource type="Resource" script_class="EnemyData" load_steps=20 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/enemy_data.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/resources/enemy_action.gd" id="2"]
+[ext_resource type="Script" path="res://scripts/effects/damage_effect.gd" id="3"]
+[ext_resource type="Script" path="res://scripts/resources/effect_data.gd" id="4"]
+[ext_resource type="Script" path="res://scripts/effects/seal_memory_effect.gd" id="5"]
+[ext_resource type="Script" path="res://scripts/effects/block_effect.gd" id="6"]
+[ext_resource type="Script" path="res://scripts/effects/apply_status_effect.gd" id="7"]
+[ext_resource type="Script" path="res://scripts/effects/discard_hand_effect.gd" id="8"]
+
+[sub_resource type="Resource" id="Resource_1"]
+script = ExtResource("3")
+amount = 8
+
+[sub_resource type="Resource" id="Resource_2"]
+script = ExtResource("5")
+turns = 2
+
+[sub_resource type="Resource" id="Resource_3"]
+script = ExtResource("2")
+label = "禁書の一撃"
+effects = Array[ExtResource("4")]([SubResource("Resource_1"), SubResource("Resource_2")])
+
+[sub_resource type="Resource" id="Resource_4"]
+script = ExtResource("3")
+amount = 18
+
+[sub_resource type="Resource" id="Resource_5"]
+script = ExtResource("2")
+label = "巨大な本"
+effects = Array[ExtResource("4")]([SubResource("Resource_4")])
+
+[sub_resource type="Resource" id="Resource_6"]
+script = ExtResource("6")
+amount = 15
+
+[sub_resource type="Resource" id="Resource_7"]
+script = ExtResource("7")
+status = &"strength"
+stacks = 2
+target = 0
+
+[sub_resource type="Resource" id="Resource_8"]
+script = ExtResource("2")
+label = "写本"
+effects = Array[ExtResource("4")]([SubResource("Resource_6"), SubResource("Resource_7")])
+
+[sub_resource type="Resource" id="Resource_9"]
+script = ExtResource("8")
+
+[sub_resource type="Resource" id="Resource_10"]
+script = ExtResource("3")
+amount = 6
+
+[sub_resource type="Resource" id="Resource_11"]
+script = ExtResource("2")
+label = "閉架"
+effects = Array[ExtResource("4")]([SubResource("Resource_9"), SubResource("Resource_10")])
+
+[resource]
+script = ExtResource("1")
+id = &"librarian"
+display_name = "忘却の司書"
+max_hp = 120
+pattern = 0
+actions = Array[ExtResource("2")]([SubResource("Resource_3"), SubResource("Resource_5"), SubResource("Resource_8"), SubResource("Resource_11")])

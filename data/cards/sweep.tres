@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="CardData" load_steps=7 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/card_data.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/effects/damage_effect.gd" id="2"]
+[ext_resource type="Script" path="res://scripts/resources/effect_data.gd" id="3"]
+[ext_resource type="Script" path="res://scripts/effects/apply_status_effect.gd" id="4"]
+
+[sub_resource type="Resource" id="Resource_1"]
+script = ExtResource("2")
+amount = 5
+
+[sub_resource type="Resource" id="Resource_2"]
+script = ExtResource("4")
+status = &"weak"
+stacks = 1
+
+[resource]
+script = ExtResource("1")
+id = &"sweep"
+display_name = "足払い"
+cost = 1
+card_type = 0
+rarity = 1
+effects = Array[ExtResource("3")]([SubResource("Resource_1"), SubResource("Resource_2")])
+keywords = Array[String]([])

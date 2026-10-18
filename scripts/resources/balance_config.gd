@@ -9,3 +9,9 @@ extends Resource
 ## この回数目以降のリシャッフルから、1回ごとに疲労が1増える
 @export var fatigue_start_reshuffle: int = 3
 @export var min_draw: int = 2
+## 弱体のとき、与えるダメージにかける倍率（端数切り捨て）
+@export var weak_multiplier: float = 0.75
+## 脆弱のとき、受けるダメージにかける倍率（端数切り捨て）
+@export var vulnerable_multiplier: float = 1.5
+## 思い出の上限
+@export var omoide_max: int = 10

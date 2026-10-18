@@ -42,5 +42,5 @@ godot --headless --path . --script tests/run_tests.gd    # 判定ロジック・
 ## 引き算デッキ（MVP開発中）
 
 同じフォルダで開発中の別ゲーム。仕様は [docs/SPEC.md](docs/SPEC.md)、開発ルールは [CLAUDE.md](CLAUDE.md)。
-マイルストーン1の戦闘は `scenes/battle/battle.tscn` を開いて「現在のシーンを実行」(F6)。
+F5で戦闘画面が始まる（メインシーンを `scenes/battle/battle.tscn` にしてある）。別ゲーム（安楽椅子冒険者）を動かすときは、`scenes/prep_screen.tscn` を開いて F6。
 テスト: `godot --headless --path . --script tests/battle_tests.gd`

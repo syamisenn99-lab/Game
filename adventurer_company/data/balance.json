@@ -41,7 +41,8 @@
 			"commission": "歩合"
 		},
 		"discontent_ratio": 0.5,
-		"leave_after_months": 2
+		"leave_after_months": 2,
+		"discontent_on_switch": 0
 	},
 	"medical": {
 		"cost": 30,

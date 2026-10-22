@@ -88,6 +88,7 @@ func _parse_balance(d: Dictionary) -> void:
 	c.employment_types = employment.get("types", c.employment_types)
 	c.discontent_ratio = float(employment.get("discontent_ratio", c.discontent_ratio))
 	c.leave_after_months = int(employment.get("leave_after_months", c.leave_after_months))
+	c.discontent_on_switch = int(employment.get("discontent_on_switch", c.discontent_on_switch))
 	var medical: Dictionary = d.get("medical", {})
 	c.medical_cost = int(medical.get("cost", c.medical_cost))
 	c.medical_rest_reduction = int(medical.get("rest_reduction", c.medical_rest_reduction))

@@ -32,6 +32,8 @@ var employment_types: Dictionary = {"regular": "専属", "commission": "歩合"}
 var discontent_ratio: float = 0.5
 ## 不満がこの月数続くと退職する
 var leave_after_months: int = 2
+## 専属から歩合に切り替えられた冒険者が、最初から抱える不満（給料を切られた恨み）
+var discontent_on_switch: int = 0
 var medical_cost: int = 30
 var medical_rest_reduction: int = 1
 var medical_reputation: int = 2

@@ -153,7 +153,7 @@ func change_contract(adventurer_id: String, type_id: String) -> String:
 	var a := adventurer(adventurer_id)
 	if a.employment_type != type_id:
 		a.employment_type = type_id
-		a.discontent = 0
+		a.discontent = config.discontent_on_switch if type_id == "commission" else 0
 		a.earned_this_month = 0
 	changed.emit()
 	return ""

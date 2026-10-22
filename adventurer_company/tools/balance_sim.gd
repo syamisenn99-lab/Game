@@ -6,10 +6,13 @@ extends SceneTree
 ##   --seed S         最初のシード。i 回目は S + i（既定 1）
 ##   --data DIR       data/*.json の代わりに読むフォルダ（例: res://data または絶対パス）
 ##   --threshold R    支度金を出す成功率のしきい値（既定 0.65）
+##   --contracts P    AI の契約の方針: regular（全員専属）/ commission（全員歩合）/ adaptive（状況に合わせる）（既定 regular）
 
 const GreedyAI := preload("res://tools/greedy_ai.gd")
 ## 「序盤」とみなす週数
 const EARLY_WEEKS := 4
+## 「最終所持金が目標以上」の割合を出す目標額
+const GOAL_STEPS: Array[int] = [300, 500, 700, 900]
 
 
 func _initialize() -> void:
@@ -22,6 +25,7 @@ func _run() -> void:
 	var first_seed := int(args.get("seed", "1"))
 	var data_dir := str(args.get("data", GameData.DEFAULT_DIR))
 	var threshold := float(args.get("threshold", "0.65"))
+	var policy := str(args.get("contracts", "regular"))
 
 	var data := GameData.load_from(data_dir)
 	if not data.is_valid():
@@ -40,6 +44,9 @@ func _run() -> void:
 	var completed_sum := 0
 	var supply_sum := 0
 	var medical_sum := 0
+	var commission_sum := 0
+	var departed_sum := 0
+	var departed_by := {}
 	var quest_stats := {}
 	for q: QuestDef in data.quests:
 		quest_stats[q.id] = {"accepted": 0, "success": 0, "unfinished": 0, "predicted": 0.0}
@@ -51,6 +58,7 @@ func _run() -> void:
 		var c := GameController.new(data, first_seed + i)
 		var ai := GreedyAI.new()
 		ai.support_threshold = threshold
+		ai.contract_policy = policy
 		var early_failures := 0
 		while not c.is_over():
 			ai.plan_week(c)
@@ -59,6 +67,8 @@ func _run() -> void:
 				var s: Dictionary = quest_stats[e.quest_id]
 				s["accepted"] += 1
 				s["predicted"] += float(ai.predicted_rates[e.quest_id])
+				for one: Dictionary in e.commissions:
+					commission_sum += int(one["amount"])
 				if config.is_success(e.check.outcome):
 					s["success"] += 1
 				elif report.week <= EARLY_WEEKS and not c.quest(e.quest_id).def.repeatable:
@@ -85,16 +95,28 @@ func _run() -> void:
 		completed_sum += c.completed_count
 		supply_sum += ai.supply_spent
 		medical_sum += ai.medical_paid
+		for a: AdventurerState in c.adventurers:
+			if a.left:
+				departed_sum += 1
+				departed_by[a.def.name] = int(departed_by.get(a.def.name, 0)) + 1
 	var elapsed := (Time.get_ticks_msec() - started) / 1000.0
 
 	print("")
 	print("== バランスシミュレーション ==")
-	print("データ: %s / 回数: %d / シード: %d〜%d / 支度金しきい値: %d%% / 所要 %.1f 秒" % [data_dir, runs, first_seed, first_seed + runs - 1, roundi(threshold * 100), elapsed])
+	print("データ: %s / 回数: %d / シード: %d〜%d / 支度金しきい値: %d%% / 契約の方針: %s / 所要 %.1f 秒" % [data_dir, runs, first_seed, first_seed + runs - 1, roundi(threshold * 100), policy, elapsed])
 	print("")
 	print("クリア率: %.1f%%（%d / %d）" % [100.0 * cleared / runs, cleared, runs])
 	print("")
 	print("最終所持金（クリアした回）: %s" % _summary(cleared_gold))
 	print("最終所持金（全体・倒産は倒産時点）: %s" % _summary(all_gold))
+	var goals := []
+	for goal: int in GOAL_STEPS:
+		var n := 0
+		for g: int in cleared_gold:
+			if g >= goal:
+				n += 1
+		goals.append("%dG以上 %.1f%%" % [goal, 100.0 * n / runs])
+	print("クリアして最終所持金が目標以上だった割合: %s" % " / ".join(goals))
 	print("")
 	print("最終所持金の分布（クリアした回、100G刻み）:")
 	_print_histogram(cleared_gold, 100, cleared)
@@ -110,6 +132,7 @@ func _run() -> void:
 	print("平均: 最終評判 %.1f / 成功数 %.2f / 完了数 %.2f / 支度金 %.0fG / 医療費 %.0fG" % [
 		float(reputation_sum) / runs, float(success_sum) / runs, float(completed_sum) / runs,
 		float(supply_sum) / runs, float(medical_sum) / runs])
+	print("歩合の支払い 平均 %.0fG / 退職 平均 %.2f人 %s" % [float(commission_sum) / runs, float(departed_sum) / runs, departed_by])
 	print("")
 	print("序盤（第1〜%d週）の通常の依頼の失敗数ごとのクリア率（挽回できるかの目安）:" % EARLY_WEEKS)
 	var keys := by_early_failures.keys()

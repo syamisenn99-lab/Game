@@ -26,9 +26,24 @@ var supply_bonuses: Array[int] = []
 var outcomes: Array[OutcomeDef] = []
 ## 負傷ID → {"name": String, "rest_weeks": int}
 var injuries: Dictionary = {}
+## 雇用形態ID → 表示名
+var employment_types: Dictionary = {"regular": "専属", "commission": "歩合"}
+## 歩合の冒険者は、その月の稼ぎが「月給 × これ」未満だと不満がたまる
+var discontent_ratio: float = 0.5
+## 不満がこの月数続くと退職する
+var leave_after_months: int = 2
 var medical_cost: int = 30
 var medical_rest_reduction: int = 1
 var medical_reputation: int = 2
+
+
+func employment_name(type_id: String) -> String:
+	return str(employment_types.get(type_id, type_id))
+
+
+## 月の最初の週か（契約を見直せる週）
+func is_month_start(week: int) -> bool:
+	return (week - 1) % weeks_per_month == 0
 
 
 func job_name(job_id: String) -> String:

@@ -84,6 +84,10 @@ func _parse_balance(d: Dictionary) -> void:
 		c.outcomes.append(od)
 		rank += 1
 	c.injuries = d.get("injuries", {})
+	var employment: Dictionary = d.get("employment", {})
+	c.employment_types = employment.get("types", c.employment_types)
+	c.discontent_ratio = float(employment.get("discontent_ratio", c.discontent_ratio))
+	c.leave_after_months = int(employment.get("leave_after_months", c.leave_after_months))
 	var medical: Dictionary = d.get("medical", {})
 	c.medical_cost = int(medical.get("cost", c.medical_cost))
 	c.medical_rest_reduction = int(medical.get("rest_reduction", c.medical_rest_reduction))
@@ -98,6 +102,7 @@ func _parse_adventurers(list: Array) -> void:
 		a.job = str(d["job"])
 		a.ability = int(d["ability"])
 		a.salary = int(d["salary"])
+		a.commission_rate = float(d.get("commission_rate", 0.0))
 		a.employment_type = str(d.get("employment_type", "regular"))
 		var skill: Dictionary = d.get("skill", {})
 		a.skill_name = str(skill.get("name", ""))
@@ -155,6 +160,10 @@ func _validate() -> void:
 		ids[a.id] = true
 		if not c.jobs.has(a.job):
 			errors.append("adventurers.json: %s の職業 %s が jobs にない" % [a.name, a.job])
+		if not c.employment_types.has(a.employment_type):
+			errors.append("adventurers.json: %s の雇用形態 %s が employment.types にない" % [a.name, a.employment_type])
+		if a.commission_rate < 0.0 or a.commission_rate >= 1.0:
+			errors.append("adventurers.json: %s の commission_rate は 0 以上 1 未満にする" % a.name)
 		if not SKILL_TYPES.has(a.skill_type):
 			errors.append("adventurers.json: %s のスキル種類 %s は未対応" % [a.name, a.skill_type])
 		if a.skill_type == "outcome_floor" and c.outcome_by_id(str(a.skill_value)) == null:

@@ -35,6 +35,14 @@
 		"light": { "name": "軽傷", "rest_weeks": 1 },
 		"heavy": { "name": "重傷", "rest_weeks": 2 }
 	},
+	"employment": {
+		"types": {
+			"regular": "専属",
+			"commission": "歩合"
+		},
+		"discontent_ratio": 0.5,
+		"leave_after_months": 2
+	},
 	"medical": {
 		"cost": 30,
 		"rest_reduction": 1,

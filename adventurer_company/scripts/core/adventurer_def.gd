@@ -7,9 +7,11 @@ var name: String = ""
 var job: String = ""
 ## 腕前
 var ability: int = 0
-## 月給
+## 月給（専属契約のとき）
 var salary: int = 0
-## 雇用形態。今回は全員 "regular"。将来、契約・歩合などを足すときの入口
+## 歩合契約のとき、依頼の報酬から本人に払う割合（0〜1）
+var commission_rate: float = 0.0
+## 最初の雇用形態（"regular" = 専属、"commission" = 歩合）
 var employment_type: String = "regular"
 var skill_name: String = ""
 var skill_description: String = ""

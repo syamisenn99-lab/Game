@@ -9,6 +9,10 @@ var supply_cost: int = 0
 var check: CheckResult
 var base_reward: int = 0
 var reward: int = 0
+## 歩合で冒険者に払った分 {"name": String, "rate": float, "amount": int}
+var commissions: Array[Dictionary] = []
+## 会社に入った額（報酬 − 歩合）
+var company_income: int = 0
 ## 実際に変わった評判（上下限で切られたあと）
 var reputation_delta: int = 0
 ## 依頼の評判上限のせいで、評判が本来より上がらなかったか

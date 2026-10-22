@@ -30,6 +30,9 @@ func _run() -> void:
 	_test("掲示板：出現・評判不足・期限切れ", _test_board)
 	_test("常設依頼：何度でも受けられる", _test_repeatable)
 	_test("常設依頼：評判の上限", _test_reputation_cap)
+	_test("契約：月の最初の週だけ見直せる", _test_contract_change)
+	_test("契約：歩合の取り分と会社の手取り", _test_commission_split)
+	_test("契約：歩合の不満と退職", _test_discontent)
 	_test("週ごとの進行フック", _test_hook)
 	_test("シードで再現できる", _test_reproducible)
 	print("- UI：派遣から結果画面まで")
@@ -580,6 +583,107 @@ func _test_reputation_cap() -> void:
 	c2.quest("q01").def.difficulty = 3
 	c2.dispatch(c2.quest("q01"), _ids(["gald"]), 0)
 	_eq(c2.end_week().entries[0].reputation_delta, 2, "通常の依頼は上限なし")
+
+
+func _test_contract_change() -> void:
+	var c := GameController.new(_data(), 1)
+	for a: AdventurerState in c.adventurers:
+		_eq(a.employment_type, "regular", "%sは最初は専属" % a.def.name)
+	var full := c.payroll()
+	_check(c.is_contract_week(), "第1週は契約を見直せる")
+	_eq(c.change_contract("gald", "commission"), "", "ガルドを歩合にする")
+	_eq(c.payroll(), full - c.adventurer("gald").def.salary, "歩合の人の月給は払わない")
+	_check(c.change_contract("gald", "freelance") != "", "ない雇用形態にはできない")
+	c.dispatch(c.quest("q01"), _ids(["tom"]), 0)
+	_check(c.change_contract("tom", "commission") != "", "派遣中の人は変えられない")
+	_advance_weeks(c, 1)
+	_check(not c.is_contract_week(), "第2週は見直せない")
+	_check(c.change_contract("gald", "regular") != "", "第2週には変えられない")
+	_advance_weeks(c, 3)
+	_eq(c.week, 5, "第5週")
+	_check(c.is_contract_week(), "第5週（2月目の最初）は見直せる")
+	_eq(c.change_contract("gald", "regular"), "", "専属に戻す")
+	_eq(c.payroll(), full, "月給がまた全員分になる")
+
+
+func _test_commission_split() -> void:
+	# 出目は常に1。ガルド（腕前2・戦士）・ミラ（腕前1）で q01（戦士）：判定値 1 + 2 + 2 + 3 = 8
+	var c := _fixed_die_controller()
+	c.change_contract("gald", "commission")
+	c.quest("q01").def.difficulty = 5  # 差 +3 → 成功（報酬 80G）
+	var party := _ids(["gald", "mira"])
+	var expected := c.expected_company_income(c.quest("q01"), party, 0)
+	_eq(expected, 80.0 - roundi(80 * 0.25), "期待値（出目が1通りなので確定）= 80 − 歩合20")
+	c.dispatch(c.quest("q01"), party, 0)
+	var entry := c.end_week().entries[0]
+	_eq(entry.reward, 80, "報酬")
+	_eq(entry.commissions.size(), 1, "歩合はガルドだけ（ミラは専属）")
+	_eq(int(entry.commissions[0]["amount"]), 20, "ガルドの取り分 25%")
+	_eq(entry.company_income, 60, "会社の手取り")
+	_eq(c.gold, 300 + 60, "所持金は手取りだけ増える")
+	_eq(c.adventurer("gald").earned_this_month, 20, "ガルドの今月の稼ぎ")
+
+	# 失敗なら歩合も0
+	var c2 := _fixed_die_controller()
+	c2.change_contract("gald", "commission")
+	c2.dispatch(c2.quest("q01"), _ids(["gald"]), 0)  # 判定値 6、難易度12 → 失敗
+	var e2 := c2.end_week().entries[0]
+	_eq(e2.reward, 0, "失敗")
+	_eq(int(e2.commissions[0]["amount"]), 0, "失敗なら歩合も0")
+	_eq(c2.adventurer("gald").earned_this_month, 0, "稼ぎなし")
+
+	# 3人とも歩合なら、報酬から3人分が引かれる
+	var c3 := _fixed_die_controller()
+	for id: String in ["gald", "lina", "oswald"]:
+		c3.change_contract(id, "commission")
+	c3.quest("q01").def.difficulty = 0
+	c3.dispatch(c3.quest("q01"), _ids(["gald", "lina", "oswald"]), 0)
+	var e3 := c3.end_week().entries[0]
+	var paid := 0
+	for one: Dictionary in e3.commissions:
+		paid += int(one["amount"])
+	_eq(paid, roundi(e3.reward * 0.25) + roundi(e3.reward * 0.2) + roundi(e3.reward * 0.3), "3人分の歩合")
+	_eq(e3.company_income, e3.reward - paid, "会社の手取り")
+
+
+func _test_discontent() -> void:
+	var c := GameController.new(_data(), 1)
+	c.change_contract("tom", "commission")
+	c.change_contract("lina", "commission")
+	c.gold = 10000
+	# 1か月、トムには仕事なし。リーナには月給の半分以上を稼がせる
+	_advance_weeks(c, 3)
+	c.adventurer("lina").earned_this_month = c.discontent_threshold(c.adventurer("lina"))
+	c.end_week()
+	var report := c.finish_week()
+	_eq(report.discontented, ["トム"] as Array[String], "稼げなかったトムは不満")
+	_eq(c.adventurer("tom").discontent, 1, "トムの不満1")
+	_eq(c.adventurer("lina").discontent, 0, "稼いだリーナは不満なし")
+	_eq(c.adventurer("tom").earned_this_month, 0, "稼ぎは月ごとにリセット")
+	_check(not c.adventurer("tom").left, "1か月目ではまだ辞めない")
+
+	# 2か月目も稼げなければ退職。派遣中のリーナは不満にならない
+	_advance_weeks(c, 3)
+	c.gold = 10000
+	c.dispatch(c.quest("s01"), _ids(["lina"]), 0)
+	c.quest("s01").weeks_left = 5
+	c.end_week()
+	var report2 := c.finish_week()
+	_eq(report2.departed, ["トム"] as Array[String], "2か月続けて稼げないと退職")
+	_check(c.adventurer("tom").left, "トムは退職")
+	_eq(c.adventurer("tom").status(), AdventurerState.Status.LEFT, "状態は退職")
+	_eq(c.adventurer("lina").discontent, 0, "派遣中は不満にならない")
+	_check(not c.idle_adventurers().has(c.adventurer("tom")), "退職した人は待機中に出ない")
+	_check(c.dispatch_error(c.quest("q07"), _ids(["tom"]), 0) != "", "退職した人は派遣できない")
+	_check(c.change_contract("tom", "regular") != "", "退職した人の契約は変えられない")
+	_eq(c.salary_for(c.adventurer("tom")), 0, "退職した人に月給は払わない")
+
+	# 専属は稼ぎがなくても辞めない
+	var c2 := GameController.new(_data(), 1)
+	c2.gold = 10000
+	_advance_weeks(c2, 8)
+	for a: AdventurerState in c2.adventurers:
+		_check(not a.left, "専属の%sは辞めない" % a.def.name)
 
 
 func _test_hook() -> void:

@@ -6,7 +6,8 @@ extends RefCounted
 ##   PLANNING で dispatch() を好きなだけ呼ぶ
 ##   → end_week()       進行中クエストを進め、終わったものを判定（WEEK_ENDING へ）
 ##   → decide_injury()  負傷者ごとに医療費を払うか決める
-##   → finish_week()    給料日の支払い・勝敗判定・次の週へ
+##   → finish_week()    給料日の支払い・歩合の冒険者の不満と退職・勝敗判定・次の週へ
+## 月の最初の週の計画フェーズでは change_contract() で雇用形態（専属／歩合）を見直せる。
 
 signal changed
 
@@ -83,11 +84,79 @@ func weeks_until_payday() -> int:
 	return w - week if w > 0 else -1
 
 
-## 月給。雇用形態ごとに計算を変えるときはここを分岐させる
+## 給料日に払う月給。歩合の冒険者と退職した冒険者は 0
 func salary_for(adventurer: AdventurerState) -> int:
+	if adventurer.left:
+		return 0
 	match adventurer.employment_type:
+		"commission":
+			return 0
 		_:
 			return adventurer.def.salary
+
+
+## 歩合の冒険者がこの月に稼がないと不満になる額
+func discontent_threshold(adventurer: AdventurerState) -> int:
+	return roundi(adventurer.def.salary * config.discontent_ratio)
+
+
+## 報酬 reward のうち、パーティの歩合の冒険者に払う分 {"id", "name", "rate", "amount"} の一覧
+func commission_split(party_ids: Array[String], reward: int) -> Array[Dictionary]:
+	var list: Array[Dictionary] = []
+	for adventurer_id: String in party_ids:
+		var a := adventurer(adventurer_id)
+		if a != null and a.is_commission():
+			list.append({"id": a.def.id, "name": a.def.name, "rate": a.def.commission_rate,
+				"amount": roundi(reward * a.def.commission_rate)})
+	return list
+
+
+## 会社の手取りの期待値（報酬 − 歩合 の期待値 − 支度金）。派遣画面と AI が使う
+func expected_company_income(q: QuestState, party_ids: Array[String], supply_tier: int) -> float:
+	var table := preview_probabilities(q, party_ids, supply_tier)
+	var expected := 0.0
+	for o: OutcomeDef in config.outcomes:
+		var reward := roundi(q.def.reward * o.reward_rate)
+		var paid := 0
+		for c: Dictionary in commission_split(party_ids, reward):
+			paid += int(c["amount"])
+		expected += table.rate(o.id) * (reward - paid)
+	return expected - config.supply_cost(supply_tier)
+
+
+# ---- 契約 ----
+
+## いま契約を見直せるか（月の最初の週の計画フェーズ）
+func is_contract_week() -> bool:
+	return phase == Phase.PLANNING and config.is_month_start(week)
+
+
+## 契約を変えられないときの理由。変えられるなら空文字
+func contract_error(adventurer_id: String, type_id: String) -> String:
+	var a := adventurer(adventurer_id)
+	if a == null or not config.employment_types.has(type_id):
+		return "契約の指定がおかしい"
+	if not is_contract_week():
+		return "契約を見直せるのは月の最初の週だけ"
+	if a.left:
+		return "%sはもう辞めている" % a.def.name
+	if a.mission_id != "":
+		return "%sは派遣中" % a.def.name
+	return ""
+
+
+## 雇用形態を変える。変えられなければ理由を返す（成功なら空文字）
+func change_contract(adventurer_id: String, type_id: String) -> String:
+	var error := contract_error(adventurer_id, type_id)
+	if error != "":
+		return error
+	var a := adventurer(adventurer_id)
+	if a.employment_type != type_id:
+		a.employment_type = type_id
+		a.discontent = 0
+		a.earned_this_month = 0
+	changed.emit()
+	return ""
 
 
 ## 給料日に払う総額
@@ -250,7 +319,12 @@ func _complete(q: QuestState) -> void:
 	entry.check = result
 	entry.base_reward = q.def.reward
 	entry.reward = roundi(q.def.reward * result.outcome.reward_rate)
-	gold += entry.reward
+	entry.commissions = commission_split(q.party_ids, entry.reward)
+	entry.company_income = entry.reward
+	for c: Dictionary in entry.commissions:
+		entry.company_income -= int(c["amount"])
+		adventurer(str(c["id"])).earned_this_month += int(c["amount"])
+	gold += entry.company_income
 	var gain := reputation_gain(q.def, result.outcome)
 	entry.reputation_capped = gain < result.outcome.reputation
 	entry.reputation_delta = _change_reputation(gain)
@@ -343,6 +417,8 @@ func finish_week() -> WeekReport:
 			return report
 		gold -= report.payroll
 		report.paid = true
+		if week < config.total_weeks:
+			_check_discontent()
 
 	if week >= config.total_weeks:
 		for q: QuestState in quests:
@@ -360,6 +436,24 @@ func finish_week() -> WeekReport:
 	phase = Phase.PLANNING
 	changed.emit()
 	return report
+
+
+## 給料日に、歩合の冒険者の今月の稼ぎを見て、不満と退職を決める。
+## 派遣中の冒険者は「仕事がある」ので不満は増えない（減りもしない）。
+func _check_discontent() -> void:
+	for a: AdventurerState in adventurers:
+		if a.left or not a.is_commission():
+			continue
+		if a.earned_this_month >= discontent_threshold(a):
+			a.discontent = 0
+		elif a.mission_id == "":
+			a.discontent += 1
+			if a.discontent >= config.leave_after_months:
+				a.left = true
+				report.departed.append(a.def.name)
+			else:
+				report.discontented.append(a.def.name)
+		a.earned_this_month = 0
 
 
 ## 週の初めに掲示板を更新する（出現・期限切れ）

@@ -121,7 +121,10 @@ func _test_data_loads() -> void:
 	var c := GameController.new(data, 1)
 	_eq(c.gold, 300, "初期所持金")
 	_eq(c.reputation, 10, "初期評判")
-	_eq(c.payroll(), 250, "月給の合計")
+	var salary_total := 0
+	for a: AdventurerDef in data.adventurers:
+		salary_total += a.salary
+	_eq(c.payroll(), salary_total, "月給の合計")
 
 
 func _test_probability_sums() -> void:
@@ -276,7 +279,7 @@ func _test_lucky() -> void:
 func _test_research() -> void:
 	var data := _data()
 	var config := data.config
-	var q03 := _quest_def(data, "q03")  # 魔術師・難易度12
+	var q03 := _quest_def(data, "q03")  # 魔術師
 	var tier0 := CheckRules.build_modifiers(_defs(data, ["oswald"]), q03, 0, config)
 	var tier1 := CheckRules.build_modifiers(_defs(data, ["oswald"]), q03, 1, config)
 	var tier3 := CheckRules.build_modifiers(_defs(data, ["oswald"]), q03, 3, config)
@@ -287,9 +290,9 @@ func _test_research() -> void:
 	_eq(tom1.total_bonus(), 0 + 1, "研究熱心なしなら支度金の分だけ")
 	var p0 := CheckRules.probabilities(tier0, config)
 	var p1 := CheckRules.probabilities(tier1, config)
-	# 差 ≥ 0 ⇔ 出目 ≥ 12 − 補正
-	_eq(p0.success_count(), 20 - (12 - 6) + 1, "研究熱心なしの成功の件数")
-	_eq(p1.success_count(), 20 - (12 - 8) + 1, "研究熱心ありの成功の件数")
+	# 差 ≥ 0 ⇔ 出目 ≥ 難易度 − 補正
+	_eq(p0.success_count(), 20 - (q03.difficulty - 6) + 1, "研究熱心なしの成功の件数")
+	_eq(p1.success_count(), 20 - (q03.difficulty - 8) + 1, "研究熱心ありの成功の件数")
 
 	# 実判定の補正にも入る
 	var c := GameController.new(_data(), 3)
@@ -365,12 +368,12 @@ func _test_payday_paid() -> void:
 	_eq(c.week, 4, "第4週")
 	_eq(c.weeks_until_payday(), 0, "第4週は今週末が給料日")
 	_eq(c.month(), 1, "第4週は1月目")
-	c.gold = 250
+	c.gold = c.payroll()
 	c.end_week()
 	var report := c.finish_week()
 	_check(report.payday, "給料日")
 	_check(report.paid, "払えた")
-	_eq(report.payroll, 250, "支払額")
+	_eq(report.payroll, c.payroll(), "支払額")
 	_eq(c.gold, 0, "ちょうど払い切って0G")
 	_eq(c.phase, GameController.Phase.PLANNING, "続行")
 	_eq(c.week, 5, "第5週へ")
@@ -380,13 +383,13 @@ func _test_payday_paid() -> void:
 func _test_payday_bankrupt() -> void:
 	var c := GameController.new(_data(), 1)
 	_advance_weeks(c, 3)
-	c.gold = 249
+	c.gold = c.payroll() - 1
 	c.end_week()
 	var report := c.finish_week()
 	_check(report.payday and not report.paid, "払えない")
 	_eq(c.phase, GameController.Phase.GAME_OVER, "倒産")
 	_eq(c.bankrupt_week, 4, "倒産した週")
-	_eq(c.gold, 249, "払えないときは引かない")
+	_eq(c.gold, c.payroll() - 1, "払えないときは引かない")
 	_check(c.is_over(), "ゲーム終了")
 
 	# 給料日でない週は所持金が少なくても倒産しない
@@ -414,7 +417,7 @@ func _test_clear_and_unfinished() -> void:
 	_eq(c.phase, GameController.Phase.CLEARED, "12週目の給料日を払えばクリア")
 	_eq(report.unfinished_quests, ["ワイバーンの巣の排除"] as Array[String], "未完了のクエスト")
 	_eq(q.status, QuestState.Status.UNFINISHED, "未完了扱い")
-	_eq(c.gold, gold_before - 250, "未完了は報酬なし（給料だけ引かれる）")
+	_eq(c.gold, gold_before - c.payroll(), "未完了は報酬なし（給料だけ引かれる）")
 	_eq(c.adventurer("gald").status(), AdventurerState.Status.IDLE, "未完了でも冒険者は戻る")
 
 

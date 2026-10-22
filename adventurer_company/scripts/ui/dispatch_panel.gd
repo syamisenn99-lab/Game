@@ -308,6 +308,8 @@ func _rebuild_party() -> void:
 		var job_match := a.def.job == q.def.job
 		v.add_child(UiKit.label("%s%s・腕前%d" % [c.config.job_name(a.def.job), "★" if job_match else "", a.def.ability], 13, UiKit.INK))
 		v.add_child(UiKit.label(a.def.skill_name, 13, UiKit.INFO))
+		if a.is_commission():
+			v.add_child(UiKit.label("歩合 %d%%" % roundi(a.def.commission_rate * 100), 13, UiKit.WARN))
 
 	UiKit.clear_children(_pool_box)
 	for a: AdventurerState in c.adventurers:
@@ -401,7 +403,12 @@ func update_preview() -> void:
 	var expected := 0.0
 	for o: OutcomeDef in c.config.outcomes:
 		expected += table.rate(o.id) * roundi(q.def.reward * o.reward_rate)
-	_expected_label.text = "報酬の期待値 約 %dG（支度金 %dG は別）" % [roundi(expected), cost]
+	var income := c.expected_company_income(q, selected_ids, supply_tier)
+	var commission := expected - cost - income
+	if commission > 0.5:
+		_expected_label.text = "会社の手取りの期待値 約 %dG（報酬 %dG − 歩合 %dG − 支度金 %dG）" % [roundi(income), roundi(expected), roundi(commission), cost]
+	else:
+		_expected_label.text = "会社の手取りの期待値 約 %dG（報酬 %dG − 支度金 %dG）" % [roundi(income), roundi(expected), cost]
 
 
 func _on_confirm() -> void:

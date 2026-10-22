@@ -101,6 +101,11 @@ func _entry_panel(c: GameController, e: QuestReportEntry) -> Control:
 	if e.reputation_capped:
 		money += "（この依頼で上がる評判は%dまで）" % c.quest(e.quest_id).def.reputation_cap
 	v.add_child(UiKit.label(money, 17, UiKit.GOOD if e.reward > 0 else UiKit.BAD))
+	if not e.commissions.is_empty():
+		var parts2: Array[String] = []
+		for one: Dictionary in e.commissions:
+			parts2.append("%s %dG（%d%%）" % [one["name"], int(one["amount"]), roundi(float(one["rate"]) * 100)])
+		v.add_child(UiKit.label("歩合：%s → 会社の取り分 %dG" % ["、".join(parts2), e.company_income], 15, UiKit.WARN, true))
 	if e.injury != null:
 		v.add_child(UiKit.label("負傷：%sが%s（休養%d週）" % [e.injury.adventurer_name, e.injury.injury_name, e.injury.rest_weeks], 16, UiKit.WARN))
 	return panel

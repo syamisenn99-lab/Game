@@ -2,6 +2,7 @@ extends PanelContainer
 ## 上部バー：週・所持金・評判・次の給料日・「週を終える」ボタン。
 
 signal end_week_pressed
+signal contract_pressed
 
 var controller: GameController
 
@@ -9,6 +10,8 @@ var _week_label: Label
 var _gold_label: Label
 var _reputation_label: Label
 var _payday_label: Label
+var _goal_label: Label
+var contract_button: Button
 var end_week_button: Button
 
 
@@ -27,6 +30,12 @@ func _ready() -> void:
 	var spacer := Control.new()
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(spacer)
+	_goal_label = UiKit.label("", 15, UiKit.CREAM_SOFT)
+	_goal_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(_goal_label)
+	contract_button = UiKit.button("契約の見直し", 16)
+	contract_button.pressed.connect(func() -> void: contract_pressed.emit())
+	row.add_child(contract_button)
 	end_week_button = UiKit.button("週を終える ▶", 18)
 	end_week_button.custom_minimum_size = Vector2(150, 0)
 	end_week_button.pressed.connect(func() -> void: end_week_pressed.emit())
@@ -54,3 +63,6 @@ func refresh() -> void:
 	if short:
 		_payday_label.text += "　⚠ 不足 %dG" % (payroll - c.gold)
 	end_week_button.disabled = c.phase != GameController.Phase.PLANNING
+	_goal_label.text = "目標 %dG" % c.config.goal_gold if c.config.goal_gold > 0 else ""
+	contract_button.disabled = not c.is_contract_week()
+	contract_button.tooltip_text = "月の最初の週だけ見直せる" if contract_button.disabled else ""

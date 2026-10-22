@@ -24,6 +24,12 @@ func _run() -> void:
 	await _frames(4)
 	await _shot("01_board")
 
+	_main.top_bar.contract_button.pressed.emit()
+	_main.contract_dialog.set_contract("gald", "commission")
+	_main.contract_dialog.set_contract("mira", "commission")
+	await _shot("01a_contract")
+	_main.contract_dialog.close_button.pressed.emit()
+
 	_main._on_quest_selected("q03")
 	await _shot("02_detail")
 

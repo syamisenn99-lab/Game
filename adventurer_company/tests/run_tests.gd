@@ -39,6 +39,9 @@ func _run() -> void:
 	print("- UI：派遣から結果画面まで")
 	_current = "UI"
 	await _test_ui_flow()
+	print("- UI：契約の見直し")
+	_current = "UI契約"
+	await _test_ui_contract()
 	print("- UI：ポートレートのドラッグ＆ドロップ（実際のマウス操作）")
 	_current = "UIドラッグ"
 	await _test_ui_drag()
@@ -972,5 +975,65 @@ func _test_ui_drag() -> void:
 	await _drag(_portrait_in(main.roster, "lina"), paper)
 	_check(not panel.visible, "受注中の依頼には落とせない")
 	_check(not _portrait_in(main.roster, "oswald").draggable, "名簿でも派遣中の人はドラッグできない")
+	main.queue_free()
+	await _frames(1)
+
+
+func _label_texts(node: Node) -> String:
+	var texts: Array[String] = []
+	for l in node.find_children("*", "Label", true, false):
+		texts.append((l as Label).text)
+	return "\n".join(texts)
+
+
+func _test_ui_contract() -> void:
+	var main: Control = load("res://scenes/main.tscn").instantiate()
+	root.add_child(main)
+	await _frames(2)
+	var c: GameController = main.controller
+	var full := c.payroll()
+	_check(not main.top_bar.contract_button.disabled, "第1週は契約の見直しボタンが押せる")
+	main.top_bar.contract_button.pressed.emit()
+	var dialog: Control = main.contract_dialog
+	_check(dialog.visible, "契約の見直しが開く")
+	dialog.buttons["gald"]["commission"].pressed.emit()
+	await _frames(1)
+	_eq(c.adventurer("gald").employment_type, "commission", "ボタンで歩合にできる")
+	_eq(c.payroll(), full - c.adventurer("gald").def.salary, "支払予定が減る")
+	_check(dialog.buttons["gald"]["commission"].button_pressed, "歩合のボタンが押された状態")
+	_check(_label_texts(dialog).contains("不満 1"), "不満が表示される")
+	dialog.close_button.pressed.emit()
+	await _frames(1)
+	_check(_label_texts(main.roster).contains("歩合38%"), "名簿に歩合と取り分が出る")
+
+	# 派遣パネルに歩合の分を引いた手取りが出る
+	main._on_quest_selected("q01")
+	main.detail.dispatch_button.pressed.emit()
+	main.dispatch_panel.set_adventurer("gald", true)
+	var expected := roundi(c.expected_company_income(c.quest("q01"), ["gald"] as Array[String], 0))
+	_check(main.dispatch_panel._expected_label.text.contains("手取りの期待値 約 %dG" % expected), "手取りの期待値（%s）" % main.dispatch_panel._expected_label.text)
+	_check(main.dispatch_panel._expected_label.text.contains("歩合"), "歩合の分が書かれている")
+	main.dispatch_panel.cancel_button.pressed.emit()
+
+	# 第2週は見直せない
+	c.end_week()
+	c.finish_week()
+	await _frames(1)
+	_check(main.top_bar.contract_button.disabled, "第2週は契約の見直しボタンが押せない")
+	main.top_bar.contract_button.pressed.emit()
+	dialog.open()
+	await _frames(1)
+	_check(dialog.buttons["gald"]["regular"].disabled, "第2週は契約のボタンが押せない")
+	dialog.close_button.pressed.emit()
+
+	# 結果画面：目標に届いたか
+	c.gold = 100000
+	_advance_weeks(c, 11)
+	_eq(c.phase, GameController.Phase.CLEARED, "最後まで進めた")
+	main.result_screen.open(c)
+	_check(main.result_screen._title.text.contains("経営達成"), "目標以上なら経営達成")
+	c.gold = c.config.goal_gold - 1
+	main.result_screen.open(c)
+	_check(main.result_screen._title.text.contains("目標未達"), "目標未満なら経営継続（目標未達）")
 	main.queue_free()
 	await _frames(1)

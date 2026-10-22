@@ -11,6 +11,7 @@ extends Control
 @onready var injury_dialog: Control = $InjuryDialog
 @onready var message_dialog: Control = $MessageDialog
 @onready var result_screen: Control = $ResultScreen
+@onready var contract_dialog: Control = $ContractDialog
 
 var controller: GameController
 var selected_quest_id: String = ""
@@ -34,9 +35,11 @@ func _ready() -> void:
 	roster.setup(controller)
 	dispatch_panel.setup(controller)
 	injury_dialog.setup(controller)
+	contract_dialog.setup(controller)
 
 	controller.changed.connect(refresh)
 	top_bar.end_week_pressed.connect(_on_end_week)
+	top_bar.contract_pressed.connect(func() -> void: contract_dialog.open())
 	board.quest_selected.connect(_on_quest_selected)
 	board.adventurer_dropped.connect(_on_adventurer_dropped)
 	detail.dispatch_requested.connect(func(id: String) -> void: dispatch_panel.open(id))
@@ -87,6 +90,12 @@ func _on_end_week() -> void:
 	var lines: Array[String] = []
 	if report.payday:
 		lines.append("給料日：月給 %dG を支払った。（残り %dG）" % [report.payroll, controller.gold])
+	if not report.discontented.is_empty():
+		lines.append("⚠ 稼ぎが足りず不満を持った歩合の冒険者：" + "、".join(report.discontented))
+	if not report.departed.is_empty():
+		lines.append("稼げないので会社を辞めた：" + "、".join(report.departed))
+	if controller.is_contract_week():
+		lines.append("月のはじめなので、上の「契約の見直し」で専属／歩合を切り替えられる。")
 	if not report.new_quests.is_empty():
 		lines.append("新しい依頼：" + "、".join(report.new_quests))
 	if not report.expired_quests.is_empty():

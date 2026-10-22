@@ -1,4 +1,4 @@
-[gd_scene load_steps=11 format=3]
+[gd_scene load_steps=12 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/main.gd" id="1_main"]
 [ext_resource type="Script" path="res://scripts/ui/top_bar.gd" id="2_top"]
@@ -10,6 +10,7 @@
 [ext_resource type="Script" path="res://scripts/ui/injury_dialog.gd" id="8_injury"]
 [ext_resource type="Script" path="res://scripts/ui/message_dialog.gd" id="9_message"]
 [ext_resource type="Script" path="res://scripts/ui/result_screen.gd" id="10_result"]
+[ext_resource type="Script" path="res://scripts/ui/contract_dialog.gd" id="11_contract"]
 
 [node name="Main" type="Control"]
 layout_mode = 3
@@ -107,3 +108,13 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("10_result")
+
+[node name="ContractDialog" type="Control" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("11_contract")

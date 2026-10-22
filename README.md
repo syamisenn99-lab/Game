@@ -38,3 +38,9 @@ godot --headless --path . --script tests/run_tests.gd    # 判定ロジック・
 | `assets/illustrations/` | イラスト（仮の絵）。差し替え方は同フォルダの README |
 | `tools/` | 仮の絵を作るスクリプト |
 | `tests/` | ヘッドレステスト |
+
+---
+
+## 別プロジェクト：冒険者会社
+
+経営シミュレーション「冒険者会社」の最小版は、独立した Godot プロジェクトとして [adventurer_company/](adventurer_company/README.md) に置いている。

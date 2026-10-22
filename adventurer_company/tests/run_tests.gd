@@ -30,6 +30,9 @@ func _run() -> void:
 	_test("掲示板：出現・評判不足・期限切れ", _test_board)
 	_test("週ごとの進行フック", _test_hook)
 	_test("シードで再現できる", _test_reproducible)
+	print("- UI：派遣から結果画面まで")
+	_current = "UI"
+	await _test_ui_flow()
 	print("")
 	if _failures == 0:
 		print("OK: %d checks passed" % _checks)
@@ -545,3 +548,75 @@ func _play_scripted(seed_value: int) -> Array:
 func _test_reproducible() -> void:
 	_eq(_play_scripted(42), _play_scripted(42), "同じシードなら同じ展開")
 	_check(_play_scripted(42) != _play_scripted(43) or _play_scripted(42) != _play_scripted(44), "シードが違えば展開が変わる")
+
+
+func _frames(n: int) -> void:
+	for i in n:
+		await process_frame
+
+
+func _test_ui_flow() -> void:
+	var main: Control = load("res://scenes/main.tscn").instantiate()
+	root.add_child(main)
+	await _frames(2)
+	var c: GameController = main.controller
+	_check(c != null, "メイン画面がゲームを作る")
+	_check(main.top_bar.end_week_button.disabled == false, "週を終えるボタンが押せる")
+
+	# 評判不足のクエストは詳細は見られるが派遣できない
+	c.reputation = 0
+	c.quest("q01").def.required_reputation = 5
+	main.refresh()
+	main._on_quest_selected("q01")
+	_check(main.detail.dispatch_button.disabled, "評判不足なら派遣ボタンが押せない")
+	_check(main.detail._status_label.text.contains("評判5で受注可"), "評判不足の理由を表示")
+	c.quest("q01").def.required_reputation = 0
+	c.reputation = 10
+	main.refresh()
+	_check(not main.detail.dispatch_button.disabled, "評判が足りれば派遣ボタンが押せる")
+
+	# 派遣パネル：選ぶたびに、実判定と同じ計算の成功率を表示する
+	main.detail.dispatch_button.pressed.emit()
+	var panel: Control = main.dispatch_panel
+	_check(panel.visible, "派遣パネルが開く")
+	_check(panel.confirm_button.disabled, "誰も選んでいなければ派遣できない")
+	var party: Array[String] = []
+	for id: String in ["gald", "mira", "oswald"]:
+		panel.set_adventurer(id, true)
+		party.append(id)
+		var expected := UiKit.percent(c.preview_probabilities(c.quest("q01"), party, 0).success_rate())
+		_eq(panel.rate_label.text, expected, "%d人のときの成功率表示" % party.size())
+	panel.set_adventurer("tom", true)
+	_eq(panel.selected_ids.size(), 3, "4人目は選べない")
+	panel.set_supply(2)
+	_eq(panel.rate_label.text, UiKit.percent(c.preview_probabilities(c.quest("q01"), party, 2).success_rate()), "支度金を変えると更新")
+	panel.set_adventurer("oswald", false)
+	party.erase("oswald")
+	_eq(panel.rate_label.text, UiKit.percent(c.preview_probabilities(c.quest("q01"), party, 2).success_rate()), "外すと更新")
+	panel.confirm_button.pressed.emit()
+	_check(not panel.visible, "派遣すると閉じる")
+	_eq(c.quest("q01").status, QuestState.Status.IN_PROGRESS, "受注中になる")
+	_eq(c.gold, 240, "支度金60Gを払った")
+
+	# 週を終える → 結果レポート → （負傷）→ 次の週。最後まで進めて結果画面を出す
+	var guard := 0
+	while not main.result_screen.visible and guard < 100:
+		guard += 1
+		if main.report_dialog.visible:
+			main.report_dialog.next_button.pressed.emit()
+		elif main.injury_dialog.visible:
+			main.injury_dialog.skip_button.pressed.emit()
+		elif main.message_dialog.visible:
+			main.message_dialog.ok_button.pressed.emit()
+		else:
+			c.gold = maxi(c.gold, 1000)
+			main.top_bar.end_week_button.pressed.emit()
+		await _frames(1)
+	_check(main.result_screen.visible, "結果画面が出る")
+	_eq(c.phase, GameController.Phase.CLEARED, "クリア")
+	main.result_screen.restart_button.pressed.emit()
+	await _frames(1)
+	_eq(c.week, 1, "もう一度遊ぶと第1週から")
+	_eq(c.gold, 300, "所持金も初期値")
+	main.queue_free()
+	await _frames(1)

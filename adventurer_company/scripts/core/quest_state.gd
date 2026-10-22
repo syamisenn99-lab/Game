@@ -18,7 +18,10 @@ var weeks_left: int = 0
 var party_ids: Array[String] = []
 var supply_tier: int = 0
 var accepted_week: int = 0
+## 最後の判定結果
 var result: CheckResult
+## 完了した回数（常設依頼は何度でも完了する）
+var times_completed: int = 0
 
 
 func _init(definition: QuestDef) -> void:

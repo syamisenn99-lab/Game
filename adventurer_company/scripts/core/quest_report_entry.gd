@@ -11,5 +11,7 @@ var base_reward: int = 0
 var reward: int = 0
 ## 実際に変わった評判（上下限で切られたあと）
 var reputation_delta: int = 0
+## 依頼の評判上限のせいで、評判が本来より上がらなかったか
+var reputation_capped: bool = false
 ## 負傷者（いなければ null）
 var injury: InjuryCase

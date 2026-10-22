@@ -28,6 +28,8 @@ func _run() -> void:
 	_test("軽傷：休養と医療費", _test_light_injury)
 	_test("大失敗：重傷と医療費", _test_heavy_injury)
 	_test("掲示板：出現・評判不足・期限切れ", _test_board)
+	_test("常設依頼：何度でも受けられる", _test_repeatable)
+	_test("常設依頼：評判の上限", _test_reputation_cap)
 	_test("週ごとの進行フック", _test_hook)
 	_test("シードで再現できる", _test_reproducible)
 	print("- UI：派遣から結果画面まで")
@@ -112,7 +114,15 @@ func _all_parties(data: GameData) -> Array:
 func _test_data_loads() -> void:
 	var data := _data()
 	_eq(data.adventurers.size(), 5, "冒険者は5人")
-	_eq(data.quests.size(), 10, "クエストは10件")
+	var normal := 0
+	var standing := 0
+	for q: QuestDef in data.quests:
+		if q.repeatable:
+			standing += 1
+		else:
+			normal += 1
+	_eq(normal, 10, "通常の依頼は10件")
+	_eq(standing, 1, "常設依頼は1件")
 	_eq(data.config.jobs.size(), 3, "職業は3種")
 	for a: AdventurerDef in data.adventurers:
 		_eq(a.employment_type, "regular", "%s の雇用形態" % a.name)
@@ -150,7 +160,7 @@ func _test_probability_sums() -> void:
 				_check(sum_counts == table.total, "件数の合計が総数に一致")
 				_check(absf(sum_rates - 1.0) < 1e-9, "確率の合計が1（%f）" % sum_rates)
 				tables += 1
-	_eq(tables, 1000, "確かめた確率表の数")
+	_eq(tables, data.quests.size() * 25 * config.supply_tier_count(), "確かめた確率表の数")
 
 
 func _test_outcome_boundaries() -> void:
@@ -495,7 +505,7 @@ func _test_board() -> void:
 	var names := []
 	for q: QuestState in c.board_quests():
 		names.append(q.def.id)
-	_eq(names, ["q01", "q02", "q03"], "第1週の掲示板")
+	_eq(names, ["q01", "q02", "q03", "s01"], "第1週の掲示板（常設依頼を含む）")
 	c.dispatch(c.quest("q01"), _ids(["gald"]), 0)
 	_check(c.board_quests().has(c.quest("q01")), "受注中の紙も掲示板に残る")
 	_advance_weeks(c, 1)
@@ -514,6 +524,59 @@ func _test_board() -> void:
 	_eq(c.quest("q02").status, QuestState.Status.EXPIRED, "第4週に q02 は消える")
 	_check(c.report.expired_quests.has("薬草採取の護衛"), "期限切れの通知")
 	_eq(c.quest("q01").status, QuestState.Status.COMPLETED, "受けたクエストは完了")
+
+
+func _test_repeatable() -> void:
+	var c := GameController.new(_data(), 1)
+	var s01 := c.quest("s01")
+	_check(s01.def.repeatable, "s01 は常設依頼")
+	_eq(s01.status, QuestState.Status.POSTED, "第1週から掲示")
+	for week in range(1, 4):
+		_eq(c.dispatch(s01, _ids(["gald"]), 0), "", "第%d週に受注できる" % week)
+		_check(c.dispatch_error(s01, _ids(["tom"]), 0) != "", "受注中はもう1組は受けられない")
+		var report := c.end_week()
+		_eq(report.entries.size(), 1, "1週で完了")
+		_eq(s01.status, QuestState.Status.POSTED, "完了すると掲示板に戻る")
+		_eq(s01.times_completed, week, "完了回数")
+		_eq(s01.party_ids.size(), 0, "パーティは解散")
+		for case: InjuryCase in c.pending_injuries():
+			c.decide_injury(case, true)
+		c.finish_week()
+		c.gold = 10000
+		if c.adventurer("gald").rest_weeks > 0:
+			c.adventurer("gald").rest_weeks = 0
+	_advance_weeks(c, 8)
+	_eq(c.week, 12, "第12週")
+	_eq(s01.status, QuestState.Status.POSTED, "常設依頼は期限切れにならない")
+	_eq(c.last_listed_week(s01), 12, "掲示は最終週まで")
+
+
+func _test_reputation_cap() -> void:
+	# 出目は常に1。ガルド単独で s01（戦士）：判定値 1 + 2 + 3 = 6。難易度を変えて結果を選ぶ
+	var cases := [
+		# [評判, 難易度, 期待する変化, 上限で削られたか]
+		[10, 3, 2, false],   # 差 +3 成功 +2（上限15に届かない）
+		[14, 3, 1, true],    # 成功 +2 だが 15 で止まる
+		[15, 3, 0, true],    # 上限ちょうどなら上がらない
+		[20, -2, 0, true],   # 上限より上でも下がりはしない（大成功 +3 → 0）
+		[20, 7, -1, false],  # 失敗の −1 は上限に関係なく下がる
+	]
+	for row: Array in cases:
+		var c := _fixed_die_controller()
+		c.reputation = row[0]
+		var s01 := c.quest("s01")
+		s01.def.difficulty = row[1]
+		c.dispatch(s01, _ids(["gald"]), 0)
+		var entry := c.end_week().entries[0]
+		_eq(entry.reputation_delta, row[2], "評判%d・%s の評判変化" % [row[0], entry.check.outcome.name])
+		_eq(entry.reputation_capped, row[3], "評判%d・%s の上限の印" % [row[0], entry.check.outcome.name])
+		_eq(c.reputation, row[0] + row[2], "評判%d・%s の評判" % [row[0], entry.check.outcome.name])
+	# 上限のない通常の依頼は、評判が高くても上がる
+	var c2 := _fixed_die_controller()
+	c2.reputation = 40
+	c2.quest("q01").def.difficulty = 3
+	c2.dispatch(c2.quest("q01"), _ids(["gald"]), 0)
+	_eq(c2.end_week().entries[0].reputation_delta, 2, "通常の依頼は上限なし")
 
 
 func _test_hook() -> void:

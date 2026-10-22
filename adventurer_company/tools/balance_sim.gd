@@ -8,6 +8,8 @@ extends SceneTree
 ##   --threshold R    支度金を出す成功率のしきい値（既定 0.65）
 
 const GreedyAI := preload("res://tools/greedy_ai.gd")
+## 「序盤」とみなす週数
+const EARLY_WEEKS := 4
 
 
 func _initialize() -> void:
@@ -41,21 +43,41 @@ func _run() -> void:
 	var quest_stats := {}
 	for q: QuestDef in data.quests:
 		quest_stats[q.id] = {"accepted": 0, "success": 0, "unfinished": 0, "predicted": 0.0}
+	## 序盤（第1〜4週）に失敗した数（3以上はまとめる）→ [回数, クリア数]
+	var by_early_failures := {}
 
 	var started := Time.get_ticks_msec()
 	for i in runs:
 		var c := GameController.new(data, first_seed + i)
 		var ai := GreedyAI.new()
 		ai.support_threshold = threshold
+		var early_failures := 0
 		while not c.is_over():
 			ai.plan_week(c)
-			c.end_week()
+			var report := c.end_week()
+			for e: QuestReportEntry in report.entries:
+				var s: Dictionary = quest_stats[e.quest_id]
+				s["accepted"] += 1
+				s["predicted"] += float(ai.predicted_rates[e.quest_id])
+				if config.is_success(e.check.outcome):
+					s["success"] += 1
+				elif report.week <= EARLY_WEEKS and not c.quest(e.quest_id).def.repeatable:
+					early_failures += 1
 			ai.decide_injuries(c)
 			c.finish_week()
+		for q: QuestState in c.quests:
+			if q.status == QuestState.Status.UNFINISHED or q.status == QuestState.Status.IN_PROGRESS:
+				quest_stats[q.def.id]["accepted"] += 1
+				quest_stats[q.def.id]["unfinished"] += 1
+		var early_key := mini(early_failures, 3)
+		if not by_early_failures.has(early_key):
+			by_early_failures[early_key] = [0, 0]
+		by_early_failures[early_key][0] += 1
 		all_gold.append(c.gold)
 		if c.phase == GameController.Phase.CLEARED:
 			cleared += 1
 			cleared_gold.append(c.gold)
+			by_early_failures[early_key][1] += 1
 		else:
 			bankrupt_weeks[c.bankrupt_week] = int(bankrupt_weeks.get(c.bankrupt_week, 0)) + 1
 		reputation_sum += c.reputation
@@ -63,16 +85,6 @@ func _run() -> void:
 		completed_sum += c.completed_count
 		supply_sum += ai.supply_spent
 		medical_sum += ai.medical_paid
-		for q: QuestState in c.quests:
-			var s: Dictionary = quest_stats[q.def.id]
-			if q.status == QuestState.Status.COMPLETED:
-				s["accepted"] += 1
-				s["predicted"] += float(ai.predicted_rates[q.def.id])
-				if config.is_success(q.result.outcome):
-					s["success"] += 1
-			elif q.status == QuestState.Status.UNFINISHED or q.status == QuestState.Status.IN_PROGRESS:
-				s["accepted"] += 1
-				s["unfinished"] += 1
 	var elapsed := (Time.get_ticks_msec() - started) / 1000.0
 
 	print("")
@@ -99,13 +111,22 @@ func _run() -> void:
 		float(reputation_sum) / runs, float(success_sum) / runs, float(completed_sum) / runs,
 		float(supply_sum) / runs, float(medical_sum) / runs])
 	print("")
-	print("クエスト別（受注率 / 受注したときの成功率：実際と、派遣画面の予測の平均 / 未完了）:")
+	print("序盤（第1〜%d週）の通常の依頼の失敗数ごとのクリア率（挽回できるかの目安）:" % EARLY_WEEKS)
+	var keys := by_early_failures.keys()
+	keys.sort()
+	for k: int in keys:
+		var row: Array = by_early_failures[k]
+		print("  失敗 %s: 全体の %5.1f%% → クリア率 %5.1f%%" % [
+			"%d回" % k if k < 3 else "3回以上", 100.0 * row[0] / runs, 100.0 * row[1] / row[0]])
+	print("")
+	print("クエスト別（受注：通常は受注率、常設は1プレイあたりの回数 / 成功率：実際と、派遣画面の予測の平均 / 未完了）:")
 	for q: QuestDef in data.quests:
 		var s: Dictionary = quest_stats[q.id]
 		var accepted := int(s["accepted"])
 		var resolved := maxi(1, accepted - int(s["unfinished"]))
-		print("  %-14s 必要評判%2d  受注 %5.1f%%  成功 実際 %5.1f%% / 予測 %5.1f%%  未完了 %d" % [
-			q.name, q.required_reputation, 100.0 * accepted / runs, 100.0 * int(s["success"]) / resolved,
+		var taken := "平均 %4.1f回" % (float(accepted) / runs) if q.repeatable else "受注 %5.1f%%" % (100.0 * accepted / runs)
+		print("  %-14s 必要評判%2d  %s  成功 実際 %5.1f%% / 予測 %5.1f%%  未完了 %d" % [
+			q.name, q.required_reputation, taken, 100.0 * int(s["success"]) / resolved,
 			100.0 * float(s["predicted"]) / resolved, int(s["unfinished"])])
 	quit(0)
 

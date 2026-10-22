@@ -15,3 +15,7 @@ var required_reputation: int = 0
 var appear_week: int = 1
 ## 依頼文
 var description: String = ""
+## 常設依頼か。常設依頼は掲示期限がなく、完了すると次の週にまた受けられる（同時に受けられるのは1組だけ）
+var repeatable: bool = false
+## この依頼で評判が上がるのは、この値まで（0 未満なら上限なし）。下がる方には効かない
+var reputation_cap: int = -1

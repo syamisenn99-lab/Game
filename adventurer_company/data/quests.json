@@ -48,5 +48,11 @@
 		"id": "q10", "name": "ワイバーンの巣の排除", "difficulty": 21, "weeks": 3, "reward": 450,
 		"job": "warrior", "required_reputation": 30, "appear_week": 8,
 		"description": "岩山にワイバーンがつがいで巣をかけ、街道の上を飛び回っている。\n卵がかえる前に巣を落とせ。領主からの正式な依頼で、報酬は破格だ。"
+	},
+	{
+		"id": "s01", "name": "街道の見回り", "difficulty": 14, "weeks": 1, "reward": 10,
+		"job": "warrior", "required_reputation": 0, "appear_week": 1,
+		"repeatable": true, "reputation_cap": 15,
+		"description": "ギルドがいつも出している常設の依頼。街道を一週間かけて見回り、異変があれば報告する。\n報酬は雀の涙だが、地道な働きぶりは町の人々の目に留まる。ただし、名の知れた会社にとってはただの雑用だ。"
 	}
 ]

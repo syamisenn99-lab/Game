@@ -117,8 +117,10 @@ func _parse_quests(list: Array) -> void:
 		q.reward = int(d["reward"])
 		q.job = str(d["job"])
 		q.required_reputation = int(d.get("required_reputation", 0))
-		q.appear_week = int(d["appear_week"])
+		q.appear_week = int(d.get("appear_week", 1))
 		q.description = str(d.get("description", ""))
+		q.repeatable = bool(d.get("repeatable", false))
+		q.reputation_cap = int(d.get("reputation_cap", -1))
 		quests.append(q)
 
 

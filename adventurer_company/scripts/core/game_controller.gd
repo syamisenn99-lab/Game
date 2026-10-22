@@ -121,8 +121,10 @@ func board_quests() -> Array[QuestState]:
 	return list
 
 
-## 掲示がこの週で終わるか（受注されないと次の週に消える）
+## 掲示がこの週で終わるか（受注されないと次の週に消える）。常設依頼は最終週まで
 func last_listed_week(q: QuestState) -> int:
+	if q.def.repeatable:
+		return config.total_weeks
 	return q.def.appear_week + config.quest_listing_weeks - 1
 
 
@@ -234,6 +236,7 @@ func _complete(q: QuestState) -> void:
 	var result := CheckRules.resolve(mods, config, rng)
 	q.result = result
 	q.status = QuestState.Status.COMPLETED
+	q.times_completed += 1
 	completed_count += 1
 	if config.is_success(result.outcome):
 		success_count += 1
@@ -248,7 +251,9 @@ func _complete(q: QuestState) -> void:
 	entry.base_reward = q.def.reward
 	entry.reward = roundi(q.def.reward * result.outcome.reward_rate)
 	gold += entry.reward
-	entry.reputation_delta = _change_reputation(result.outcome.reputation)
+	var gain := reputation_gain(q.def, result.outcome)
+	entry.reputation_capped = gain < result.outcome.reputation
+	entry.reputation_delta = _change_reputation(gain)
 
 	for adventurer_id: String in q.party_ids:
 		adventurer(adventurer_id).mission_id = ""
@@ -266,6 +271,20 @@ func _complete(q: QuestState) -> void:
 		entry.injury = case
 		report.injuries.append(case)
 	report.entries.append(entry)
+
+	# 常設依頼は掲示板に戻り、次の週からまた受けられる
+	if q.def.repeatable:
+		q.status = QuestState.Status.POSTED
+		q.party_ids.clear()
+		q.supply_tier = 0
+
+
+## この依頼のこの結果で変わる評判（評判上限を反映。上限を超えている分は上がらないが、下がりもしない）
+func reputation_gain(quest_def: QuestDef, outcome: OutcomeDef) -> int:
+	var delta := outcome.reputation
+	if delta > 0 and quest_def.reputation_cap >= 0:
+		delta = clampi(quest_def.reputation_cap - reputation, 0, delta)
+	return delta
 
 
 func _change_reputation(delta: int) -> int:

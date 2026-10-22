@@ -1,0 +1,52 @@
+[
+	{
+		"id": "q01", "name": "村はずれのゴブリン退治", "difficulty": 10, "weeks": 1, "reward": 80,
+		"job": "warrior", "required_reputation": 0, "appear_week": 1,
+		"description": "村はずれの麦畑に、夜な夜なゴブリンが出て作物を荒らしていく。\n数は五、六匹ほど。村の若い衆では手に負えないので、追い払ってほしい。"
+	},
+	{
+		"id": "q02", "name": "薬草採取の護衛", "difficulty": 8, "weeks": 1, "reward": 50,
+		"job": "scout", "required_reputation": 0, "appear_week": 1,
+		"description": "薬師の見習いが、東の丘へ月光草を摘みに行く。\n危険は少ないが、道に迷いやすい土地なので、道案内のできる者を頼みたい。"
+	},
+	{
+		"id": "q03", "name": "古井戸の怪音調査", "difficulty": 12, "weeks": 1, "reward": 90,
+		"job": "mage", "required_reputation": 0, "appear_week": 1,
+		"description": "使われなくなった古井戸の底から、毎晩うめき声のような音がする。\n住人は呪いを恐れて近づかない。正体を突きとめ、必要なら鎮めてほしい。"
+	},
+	{
+		"id": "q04", "name": "峠越えの商隊護衛", "difficulty": 13, "weeks": 2, "reward": 160,
+		"job": "warrior", "required_reputation": 0, "appear_week": 2,
+		"description": "塩と布を積んだ商隊が、山賊の出る峠を越える。\n往復で二週間。荷を一つも失わずに届けられれば、報酬ははずむ。"
+	},
+	{
+		"id": "q05", "name": "盗賊団のアジト偵察", "difficulty": 14, "weeks": 2, "reward": 180,
+		"job": "scout", "required_reputation": 15, "appear_week": 3,
+		"description": "街道を荒らす「赤狐団」の隠れ家が、北の森のどこかにあるらしい。\n討伐隊を出す前に、場所と人数を調べてきてほしい。見つからないことが肝心だ。"
+	},
+	{
+		"id": "q06", "name": "呪われた指輪の解呪", "difficulty": 14, "weeks": 1, "reward": 150,
+		"job": "mage", "required_reputation": 15, "appear_week": 4,
+		"description": "亡き祖母の形見の指輪をはめてから、娘が毎晩うなされている。\n外そうとしても指から抜けない。どうか呪いを解いてやってほしい。"
+	},
+	{
+		"id": "q07", "name": "森の大狼討伐", "difficulty": 15, "weeks": 2, "reward": 220,
+		"job": "warrior", "required_reputation": 20, "appear_week": 5,
+		"description": "牛ほどもある灰色の大狼が、森の奥から家畜を襲いにくる。\n猟師が二人やられた。腕の確かな者に、群れの頭を仕留めてほしい。"
+	},
+	{
+		"id": "q08", "name": "廃坑の地図作成", "difficulty": 13, "weeks": 3, "reward": 240,
+		"job": "scout", "required_reputation": 20, "appear_week": 6,
+		"description": "五十年前に閉じた銀の廃坑を、鉱山組合が再開したがっている。\n崩れた坑道を避けて、使える道を記した地図を作ってほしい。長丁場になる。"
+	},
+	{
+		"id": "q09", "name": "遺跡の封印修復", "difficulty": 17, "weeks": 2, "reward": 300,
+		"job": "mage", "required_reputation": 25, "appear_week": 7,
+		"description": "丘の上の古代遺跡で、封印の石碑にひびが入った。\n中に何が眠っているのか、誰も知らない。目を覚ます前に、封印を結び直してほしい。"
+	},
+	{
+		"id": "q10", "name": "ワイバーンの巣の排除", "difficulty": 19, "weeks": 3, "reward": 450,
+		"job": "warrior", "required_reputation": 30, "appear_week": 8,
+		"description": "岩山にワイバーンがつがいで巣をかけ、街道の上を飛び回っている。\n卵がかえる前に巣を落とせ。領主からの正式な依頼で、報酬は破格だ。"
+	}
+]

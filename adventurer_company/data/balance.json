@@ -1,0 +1,43 @@
+{
+	"initial_gold": 300,
+	"initial_reputation": 10,
+	"reputation_min": 0,
+	"reputation_max": 100,
+	"total_weeks": 12,
+	"weeks_per_month": 4,
+	"payday_weeks": [4, 8, 12],
+	"party_min": 1,
+	"party_max": 3,
+	"dice_sides": 20,
+	"extra_member_bonus": 2,
+	"job_match_bonus": 3,
+	"quest_listing_weeks": 3,
+	"success_outcome": "narrow_success",
+	"jobs": {
+		"warrior": "戦士",
+		"scout": "斥候",
+		"mage": "魔術師"
+	},
+	"supply_tiers": [
+		{ "cost": 0, "bonus": 0 },
+		{ "cost": 30, "bonus": 1 },
+		{ "cost": 60, "bonus": 2 },
+		{ "cost": 100, "bonus": 3 }
+	],
+	"outcomes": [
+		{ "id": "great_success", "name": "大成功", "min_diff": 8, "reward_rate": 1.5, "reputation": 3, "injury": "" },
+		{ "id": "success", "name": "成功", "min_diff": 3, "reward_rate": 1.0, "reputation": 2, "injury": "" },
+		{ "id": "narrow_success", "name": "辛勝", "min_diff": 0, "reward_rate": 0.8, "reputation": 1, "injury": "light" },
+		{ "id": "failure", "name": "失敗", "min_diff": -5, "reward_rate": 0.0, "reputation": -1, "injury": "" },
+		{ "id": "great_failure", "name": "大失敗", "min_diff": null, "reward_rate": 0.0, "reputation": -3, "injury": "heavy" }
+	],
+	"injuries": {
+		"light": { "name": "軽傷", "rest_weeks": 1 },
+		"heavy": { "name": "重傷", "rest_weeks": 2 }
+	},
+	"medical": {
+		"cost": 30,
+		"rest_reduction": 1,
+		"reputation": 2
+	}
+}

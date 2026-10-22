@@ -1,6 +1,7 @@
 {
 	"initial_gold": 300,
 	"initial_reputation": 10,
+	"goal_gold": 500,
 	"reputation_min": 0,
 	"reputation_max": 100,
 	"total_weeks": 12,
@@ -42,7 +43,7 @@
 		},
 		"discontent_ratio": 0.5,
 		"leave_after_months": 2,
-		"discontent_on_switch": 0
+		"discontent_on_switch": 1
 	},
 	"medical": {
 		"cost": 30,

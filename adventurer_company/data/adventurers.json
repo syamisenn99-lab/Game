@@ -5,7 +5,7 @@
 		"job": "warrior",
 		"ability": 2,
 		"salary": 90,
-		"commission_rate": 0.25,
+		"commission_rate": 0.38,
 		"employment_type": "regular",
 		"portrait": { "hair": "4a2e1a", "skin": "d9a77f", "beard": true },
 		"skill": { "name": "鉄壁", "description": "このパーティは大失敗にならない（失敗止まり）", "type": "outcome_floor", "value": "failure" }
@@ -16,7 +16,7 @@
 		"job": "scout",
 		"ability": 1,
 		"salary": 60,
-		"commission_rate": 0.2,
+		"commission_rate": 0.3,
 		"employment_type": "regular",
 		"portrait": { "hair": "b5482a", "skin": "f0cfae" },
 		"skill": { "name": "先読み", "description": "パーティの判定 +2", "type": "party_bonus", "value": 2 }
@@ -27,7 +27,7 @@
 		"job": "mage",
 		"ability": 3,
 		"salary": 120,
-		"commission_rate": 0.3,
+		"commission_rate": 0.45,
 		"employment_type": "regular",
 		"portrait": { "hair": "d8d8d0", "skin": "e6c3a2", "beard": true },
 		"skill": { "name": "研究熱心", "description": "支度金を出したとき支度金補正 +1", "type": "supply_bonus", "value": 1 }
@@ -38,7 +38,7 @@
 		"job": "warrior",
 		"ability": 0,
 		"salary": 40,
-		"commission_rate": 0.1,
+		"commission_rate": 0.15,
 		"employment_type": "regular",
 		"portrait": { "hair": "d9b44a", "skin": "f2d2b0" },
 		"skill": { "name": "薄給", "description": "月給が安い（効果は月給の低さそのもの）", "type": "none", "value": 0 }
@@ -49,7 +49,7 @@
 		"job": "scout",
 		"ability": 1,
 		"salary": 70,
-		"commission_rate": 0.2,
+		"commission_rate": 0.3,
 		"employment_type": "regular",
 		"portrait": { "hair": "1f1a24", "skin": "e9c39c" },
 		"skill": { "name": "強運", "description": "d20を2回振って高い方を使う", "type": "advantage", "value": 2 }

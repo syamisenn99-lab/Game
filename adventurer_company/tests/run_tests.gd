@@ -25,6 +25,7 @@ func _run() -> void:
 	_test("給料日の支払い", _test_payday_paid)
 	_test("給料日に払えなければ倒産", _test_payday_bankrupt)
 	_test("12週でクリア・未完了は報酬なし", _test_clear_and_unfinished)
+	_test("経営目標", _test_goal)
 	_test("軽傷：休養と医療費", _test_light_injury)
 	_test("大失敗：重傷と医療費", _test_heavy_injury)
 	_test("掲示板：出現・評判不足・期限切れ", _test_board)
@@ -437,6 +438,24 @@ func _test_clear_and_unfinished() -> void:
 	_eq(c.adventurer("gald").status(), AdventurerState.Status.IDLE, "未完了でも冒険者は戻る")
 
 
+func _test_goal() -> void:
+	for extra in [0, -1]:
+		var c := GameController.new(_data(), 1)
+		c.gold = 10000
+		_advance_weeks(c, 11)
+		c.gold = c.config.goal_gold + c.payroll() + extra
+		c.end_week()
+		c.finish_week()
+		_eq(c.phase, GameController.Phase.CLEARED, "最後の給料日を払えば倒産はしない")
+		_eq(c.goal_reached(), extra == 0, "給料日のあとの所持金 %dG（目標 %dG）" % [c.gold, c.config.goal_gold])
+	var bankrupt := GameController.new(_data(), 1)
+	_advance_weeks(bankrupt, 3)
+	bankrupt.gold = 0
+	bankrupt.end_week()
+	bankrupt.finish_week()
+	_check(not bankrupt.goal_reached(), "倒産したら目標は未達")
+
+
 func _test_light_injury() -> void:
 	# 出目は常に1。トム単独で q01（戦士）：判定値 1 + 3 = 4。難易度を4にして差0 → 辛勝
 	for pay in [false, true]:
@@ -587,6 +606,7 @@ func _test_reputation_cap() -> void:
 
 func _test_contract_change() -> void:
 	var c := GameController.new(_data(), 1)
+	c.config.discontent_on_switch = 0  # ここでは切り替えの恨みで辞めないようにする
 	for a: AdventurerState in c.adventurers:
 		_eq(a.employment_type, "regular", "%sは最初は専属" % a.def.name)
 	var full := c.payroll()
@@ -612,16 +632,18 @@ func _test_commission_split() -> void:
 	c.change_contract("gald", "commission")
 	c.quest("q01").def.difficulty = 5  # 差 +3 → 成功（報酬 80G）
 	var party := _ids(["gald", "mira"])
+	var gald_share := roundi(80 * c.adventurer("gald").def.commission_rate)
+	_check(gald_share > 0, "ガルドの取り分は0より大きい")
 	var expected := c.expected_company_income(c.quest("q01"), party, 0)
-	_eq(expected, 80.0 - roundi(80 * 0.25), "期待値（出目が1通りなので確定）= 80 − 歩合20")
+	_eq(expected, 80.0 - gald_share, "期待値（出目が1通りなので確定）= 80 − ガルドの取り分")
 	c.dispatch(c.quest("q01"), party, 0)
 	var entry := c.end_week().entries[0]
 	_eq(entry.reward, 80, "報酬")
 	_eq(entry.commissions.size(), 1, "歩合はガルドだけ（ミラは専属）")
-	_eq(int(entry.commissions[0]["amount"]), 20, "ガルドの取り分 25%")
-	_eq(entry.company_income, 60, "会社の手取り")
-	_eq(c.gold, 300 + 60, "所持金は手取りだけ増える")
-	_eq(c.adventurer("gald").earned_this_month, 20, "ガルドの今月の稼ぎ")
+	_eq(int(entry.commissions[0]["amount"]), gald_share, "ガルドの取り分")
+	_eq(entry.company_income, 80 - gald_share, "会社の手取り")
+	_eq(c.gold, 300 + 80 - gald_share, "所持金は手取りだけ増える")
+	_eq(c.adventurer("gald").earned_this_month, gald_share, "ガルドの今月の稼ぎ")
 
 	# 失敗なら歩合も0
 	var c2 := _fixed_die_controller()
@@ -642,12 +664,16 @@ func _test_commission_split() -> void:
 	var paid := 0
 	for one: Dictionary in e3.commissions:
 		paid += int(one["amount"])
-	_eq(paid, roundi(e3.reward * 0.25) + roundi(e3.reward * 0.2) + roundi(e3.reward * 0.3), "3人分の歩合")
+	var expected_paid := 0
+	for id: String in ["gald", "lina", "oswald"]:
+		expected_paid += roundi(e3.reward * c3.adventurer(id).def.commission_rate)
+	_eq(paid, expected_paid, "3人分の歩合")
 	_eq(e3.company_income, e3.reward - paid, "会社の手取り")
 
 
 func _test_discontent() -> void:
 	var c := GameController.new(_data(), 1)
+	c.config.discontent_on_switch = 0  # まずは切り替えの恨みなしで、月ごとの不満を確かめる
 	c.change_contract("tom", "commission")
 	c.change_contract("lina", "commission")
 	c.gold = 10000
@@ -677,6 +703,19 @@ func _test_discontent() -> void:
 	_check(c.dispatch_error(c.quest("q07"), _ids(["tom"]), 0) != "", "退職した人は派遣できない")
 	_check(c.change_contract("tom", "regular") != "", "退職した人の契約は変えられない")
 	_eq(c.salary_for(c.adventurer("tom")), 0, "退職した人に月給は払わない")
+
+	# 切り替えの恨みがあると、最初の月に稼げなければすぐ辞める
+	var c3 := GameController.new(_data(), 1)
+	_eq(c3.config.discontent_on_switch, 1, "データの切り替えの恨みは1")
+	c3.change_contract("tom", "commission")
+	_eq(c3.adventurer("tom").discontent, 1, "歩合に切り替えた直後から不満1")
+	c3.gold = 10000
+	_advance_weeks(c3, 4)
+	_check(c3.adventurer("tom").left, "最初の月に稼げなければ退職")
+	var c4 := GameController.new(_data(), 1)
+	c4.change_contract("tom", "commission")
+	c4.change_contract("tom", "regular")
+	_eq(c4.adventurer("tom").discontent, 0, "専属に戻せば不満は消える")
 
 	# 専属は稼ぎがなくても辞めない
 	var c2 := GameController.new(_data(), 1)

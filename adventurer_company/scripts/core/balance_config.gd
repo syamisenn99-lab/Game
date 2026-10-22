@@ -4,6 +4,8 @@ extends RefCounted
 
 var initial_gold: int = 300
 var initial_reputation: int = 10
+## 経営目標：最終週の給料日のあと、この額以上残っていれば経営達成（0 なら倒産しなければ達成）
+var goal_gold: int = 0
 var reputation_min: int = 0
 var reputation_max: int = 100
 var total_weeks: int = 12

@@ -11,6 +11,7 @@ extends RefCounted
 
 signal changed
 
+## CLEARED は「最後の給料日まで倒産しなかった」。経営目標に届いたかは goal_reached() で見る
 enum Phase { PLANNING, WEEK_ENDING, GAME_OVER, CLEARED }
 
 var data: GameData
@@ -68,6 +69,11 @@ func new_game(seed_value: int) -> void:
 
 func is_over() -> bool:
 	return phase == Phase.GAME_OVER or phase == Phase.CLEARED
+
+
+## 最後まで倒産せず、経営目標の所持金にも届いたか（CLEARED のときだけ意味がある）
+func goal_reached() -> bool:
+	return phase == Phase.CLEARED and gold >= config.goal_gold
 
 
 func month() -> int:

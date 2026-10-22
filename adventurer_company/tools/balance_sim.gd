@@ -36,6 +36,7 @@ func _run() -> void:
 	var config := data.config
 
 	var cleared := 0
+	var goal_reached := 0
 	var cleared_gold: Array[int] = []
 	var all_gold: Array[int] = []
 	var bankrupt_weeks := {}
@@ -84,6 +85,8 @@ func _run() -> void:
 			by_early_failures[early_key] = [0, 0]
 		by_early_failures[early_key][0] += 1
 		all_gold.append(c.gold)
+		if c.goal_reached():
+			goal_reached += 1
 		if c.phase == GameController.Phase.CLEARED:
 			cleared += 1
 			cleared_gold.append(c.gold)
@@ -105,7 +108,8 @@ func _run() -> void:
 	print("== バランスシミュレーション ==")
 	print("データ: %s / 回数: %d / シード: %d〜%d / 支度金しきい値: %d%% / 契約の方針: %s / 所要 %.1f 秒" % [data_dir, runs, first_seed, first_seed + runs - 1, roundi(threshold * 100), policy, elapsed])
 	print("")
-	print("クリア率: %.1f%%（%d / %d）" % [100.0 * cleared / runs, cleared, runs])
+	print("経営達成率（倒産せず、最終所持金 %dG 以上）: %.1f%%（%d / %d）" % [config.goal_gold, 100.0 * goal_reached / runs, goal_reached, runs])
+	print("クリア率（倒産しなかった率）: %.1f%%（%d / %d）" % [100.0 * cleared / runs, cleared, runs])
 	print("")
 	print("最終所持金（クリアした回）: %s" % _summary(cleared_gold))
 	print("最終所持金（全体・倒産は倒産時点）: %s" % _summary(all_gold))

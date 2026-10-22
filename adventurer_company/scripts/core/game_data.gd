@@ -52,6 +52,7 @@ func _parse_balance(d: Dictionary) -> void:
 	var c := config
 	c.initial_gold = int(d.get("initial_gold", c.initial_gold))
 	c.initial_reputation = int(d.get("initial_reputation", c.initial_reputation))
+	c.goal_gold = int(d.get("goal_gold", c.goal_gold))
 	c.reputation_min = int(d.get("reputation_min", c.reputation_min))
 	c.reputation_max = int(d.get("reputation_max", c.reputation_max))
 	c.total_weeks = int(d.get("total_weeks", c.total_weeks))

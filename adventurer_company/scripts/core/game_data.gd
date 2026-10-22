@@ -104,6 +104,7 @@ func _parse_adventurers(list: Array) -> void:
 		a.skill_description = str(skill.get("description", ""))
 		a.skill_type = str(skill.get("type", "none"))
 		a.skill_value = skill.get("value", 0)
+		a.portrait = d.get("portrait", {})
 		adventurers.append(a)
 
 

@@ -1,5 +1,6 @@
 extends Control
-## 派遣パネル。冒険者と支度金を選ぶたびに、成功率と5段階の内訳をその場で計算し直す。
+## 派遣パネル。冒険者のポートレートをパーティ枠へドラッグ（またはクリック）し、支度金を選ぶ。
+## 選ぶたびに、成功率と5段階の内訳をその場で計算し直す。
 ## 表示する確率は GameController.preview_modifiers と CheckRules.probabilities から出す（実判定と同じ計算）。
 
 signal dispatched(quest_id: String)
@@ -8,16 +9,21 @@ signal closed
 const BAR_WIDTH := 170.0
 ## 右側（成功率の欄）の中身の幅
 const RIGHT_WIDTH := 370.0
+const Portrait := preload("res://scripts/ui/portrait.gd")
+const DropTarget := preload("res://scripts/ui/drop_target.gd")
 
 var controller: GameController
 var quest_id: String = ""
+## パーティ枠（空きは ""）。selected_ids はこれを左から詰めたもの
+var slots: Array[String] = []
 var selected_ids: Array[String] = []
 var supply_tier: int = 0
 
 var _title: Label
 var _subtitle: Label
-var _adventurer_box: VBoxContainer
-var _checks: Dictionary = {}
+var _slot_box: HBoxContainer
+var _pool_box: HBoxContainer
+var _hint_label: Label
 var _supply_box: HBoxContainer
 var _supply_buttons: Array[Button] = []
 var rate_label: Label
@@ -50,11 +56,22 @@ func _ready() -> void:
 	left.custom_minimum_size = Vector2(600, 0)
 	left.add_theme_constant_override("separation", 6)
 	cols.add_child(left)
-	left.add_child(UiKit.label("冒険者を選ぶ（待機中のみ・1〜3人）", 17))
-	_adventurer_box = VBoxContainer.new()
-	_adventurer_box.add_theme_constant_override("separation", 4)
-	left.add_child(_adventurer_box)
-	left.add_child(HSeparator.new())
+	left.add_child(UiKit.label("パーティ（ポートレートをここへドラッグ・1〜3人）", 17))
+	_slot_box = HBoxContainer.new()
+	_slot_box.add_theme_constant_override("separation", 10)
+	left.add_child(_slot_box)
+	left.add_child(UiKit.label("冒険者（待機中の人をドラッグ、またはクリックで出し入れ）", 15, UiKit.INK_SOFT))
+	var pool: Control = DropTarget.new()
+	pool.setup(UiKit.box(Color("efe5cc"), Color("d8c8a6"), 1, 6, 6), UiKit.box(Color("f6edd6"), Color("c9a24a"), 2, 6, 6),
+		func(data: Variant) -> bool: return Portrait.is_adventurer_drag(data) and data["source"] == "slot",
+		func(data: Variant) -> void: remove_adventurer(str(data["id"])))
+	left.add_child(pool)
+	_pool_box = HBoxContainer.new()
+	_pool_box.add_theme_constant_override("separation", 8)
+	pool.add_child(_pool_box)
+	_hint_label = UiKit.label("", 13, UiKit.INK_SOFT, true)
+	_hint_label.custom_minimum_size = Vector2(600, 36)
+	left.add_child(_hint_label)
 	left.add_child(UiKit.label("支度金（派遣時に支払う。失敗しても戻らない）", 17))
 	_supply_box = HBoxContainer.new()
 	_supply_box.add_theme_constant_override("separation", 8)
@@ -141,7 +158,7 @@ func setup(c: GameController) -> void:
 		_outcome_rows[o.id] = {"fill": fill, "pct": pct}
 
 
-func open(id: String) -> void:
+func open(id: String, preset_ids: Array[String] = []) -> void:
 	quest_id = id
 	selected_ids.clear()
 	supply_tier = 0
@@ -153,42 +170,11 @@ func open(id: String) -> void:
 	if q.def.reputation_cap >= 0:
 		_subtitle.text += " ／ 評判は%dまで（いま %d）" % [q.def.reputation_cap, c.reputation]
 
-	UiKit.clear_children(_adventurer_box)
-	_checks.clear()
-	for a: AdventurerState in c.adventurers:
-		var row := PanelContainer.new()
-		row.add_theme_stylebox_override("panel", UiKit.box(Color("fbf5e6"), Color("d8c8a6"), 1, 4, 6))
-		var h := HBoxContainer.new()
-		h.add_theme_constant_override("separation", 10)
-		row.add_child(h)
-		var check := CheckBox.new()
-		check.text = a.def.name
-		check.focus_mode = Control.FOCUS_NONE
-		check.custom_minimum_size = Vector2(118, 0)
-		check.add_theme_font_size_override("font_size", 17)
-		for key in ["font_color", "font_hover_color", "font_pressed_color", "font_hover_pressed_color"]:
-			check.add_theme_color_override(key, UiKit.INK)
-		check.add_theme_color_override("font_disabled_color", Color("9a8f80"))
-		check.disabled = not a.is_idle()
-		check.toggled.connect(_on_adventurer_toggled.bind(a.def.id))
-		h.add_child(check)
-		var job_match := a.def.job == q.def.job
-		var info := UiKit.label("%s%s・腕前%d" % [c.config.job_name(a.def.job), "★" if job_match else "", a.def.ability], 15, UiKit.INK)
-		info.custom_minimum_size = Vector2(118, 0)
-		h.add_child(info)
-		var skill := UiKit.label("%s：%s" % [a.def.skill_name, a.def.skill_description], 13, UiKit.INK_SOFT, true)
-		skill.custom_minimum_size = Vector2(200, 0)
-		skill.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		h.add_child(skill)
-		var status: Array = preload("res://scripts/ui/roster_panel.gd").status_text(c, a)
-		var status_label := UiKit.label(status[0], 14, status[1])
-		status_label.custom_minimum_size = Vector2(120, 0)
-		status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-		h.add_child(status_label)
-		if not a.is_idle():
-			row.modulate = Color(1, 1, 1, 0.6)
-		_adventurer_box.add_child(row)
-		_checks[a.def.id] = check
+	slots.clear()
+	for i in c.config.party_max:
+		slots.append("")
+	_hint_label.text = "ポートレートにマウスを乗せると、スキルの説明が出る。"
+	_rebuild_party()
 
 	for tier in _supply_buttons.size():
 		var b := _supply_buttons[tier]
@@ -198,6 +184,8 @@ func open(id: String) -> void:
 			b.text = "%dG（+%d）" % [c.config.supply_cost(tier), c.config.supply_bonus(tier)]
 			b.disabled = c.config.supply_cost(tier) > c.gold
 			b.set_pressed_no_signal(tier == 0)
+	for adventurer_id: String in preset_ids:
+		add_adventurer(adventurer_id)
 	visible = true
 	update_preview()
 
@@ -207,10 +195,12 @@ func close() -> void:
 	closed.emit()
 
 
-## 冒険者を選ぶ（テストやキーボード操作からも呼べる）
+## 冒険者を選ぶ・外す（テストなどからも呼べる）
 func set_adventurer(adventurer_id: String, on: bool) -> void:
-	var check: CheckBox = _checks[adventurer_id]
-	check.button_pressed = on
+	if on:
+		add_adventurer(adventurer_id)
+	else:
+		remove_adventurer(adventurer_id)
 
 
 func set_supply(tier: int) -> void:
@@ -218,15 +208,133 @@ func set_supply(tier: int) -> void:
 	_on_supply_pressed(tier)
 
 
-func _on_adventurer_toggled(on: bool, adventurer_id: String) -> void:
-	if on and not selected_ids.has(adventurer_id):
-		if not controller.adventurer(adventurer_id).is_idle() or selected_ids.size() >= controller.config.party_max:
-			(_checks[adventurer_id] as CheckBox).set_pressed_no_signal(false)
-			return
-		selected_ids.append(adventurer_id)
-	elif not on:
-		selected_ids.erase(adventurer_id)
+## 空いている枠に入れる。入れられなければ false
+func add_adventurer(adventurer_id: String) -> bool:
+	if slots.has(adventurer_id):
+		return true
+	var index := slots.find("")
+	if index < 0:
+		return false
+	return place_adventurer(adventurer_id, index)
+
+
+## 指定の枠に置く。枠に別の人がいれば、パーティ内の移動なら入れ替え、外から来たならその人を外す
+func place_adventurer(adventurer_id: String, index: int) -> bool:
+	if not can_place(adventurer_id) or index < 0 or index >= slots.size():
+		return false
+	var from := slots.find(adventurer_id)
+	if from == index:
+		return true
+	if from >= 0:
+		slots[from] = slots[index]
+	slots[index] = adventurer_id
+	_rebuild_party()
 	update_preview()
+	return true
+
+
+func remove_adventurer(adventurer_id: String) -> void:
+	var index := slots.find(adventurer_id)
+	if index < 0:
+		return
+	slots[index] = ""
+	_rebuild_party()
+	update_preview()
+
+
+## 派遣パネルに置ける冒険者か（待機中のみ）
+func can_place(adventurer_id: String) -> bool:
+	var a := controller.adventurer(adventurer_id)
+	return a != null and a.is_idle()
+
+
+func _toggle(adventurer_id: String) -> void:
+	if slots.has(adventurer_id):
+		remove_adventurer(adventurer_id)
+	else:
+		add_adventurer(adventurer_id)
+
+
+func _show_hint(adventurer_id: String) -> void:
+	var d := controller.adventurer(adventurer_id).def
+	_hint_label.text = "%s（%s・腕前%d・月給%dG）　%s：%s" % [
+		d.name, controller.config.job_name(d.job), d.ability, d.salary, d.skill_name, d.skill_description]
+
+
+func _make_portrait(a: AdventurerState, size: Vector2, can_drag: bool, from: String) -> Control:
+	var p: Control = Portrait.new()
+	p.custom_minimum_size = size
+	p.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	p.setup(a.def, controller.config.job_name(a.def.job), can_drag, from)
+	p.hovered.connect(_show_hint)
+	return p
+
+
+## パーティ枠と冒険者一覧を作り直す
+func _rebuild_party() -> void:
+	var c := controller
+	var q := c.quest(quest_id)
+	selected_ids.clear()
+	for id: String in slots:
+		if id != "":
+			selected_ids.append(id)
+
+	UiKit.clear_children(_slot_box)
+	for i in slots.size():
+		var slot: Control = DropTarget.new()
+		slot.custom_minimum_size = Vector2(186, 104)
+		slot.setup(UiKit.box(Color("fbf5e6"), Color("b89f6e"), 2, 6, 8), UiKit.box(Color("fff6dc"), Color("c9a24a"), 3, 6, 8),
+			func(data: Variant) -> bool: return Portrait.is_adventurer_drag(data) and can_place(str(data["id"])),
+			func(data: Variant) -> void: place_adventurer(str(data["id"]), i))
+		_slot_box.add_child(slot)
+		if slots[i] == "":
+			var empty := UiKit.label("空き\nここにドラッグ", 14, Color("a8987a"))
+			empty.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			empty.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+			slot.add_child(empty)
+			continue
+		var a := c.adventurer(slots[i])
+		var h := HBoxContainer.new()
+		h.add_theme_constant_override("separation", 8)
+		h.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		slot.add_child(h)
+		var p := _make_portrait(a, Vector2(66, 80), true, "slot")
+		p.clicked.connect(remove_adventurer)
+		h.add_child(p)
+		var v := VBoxContainer.new()
+		v.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		h.add_child(v)
+		v.add_child(UiKit.label(a.def.name, 16))
+		var job_match := a.def.job == q.def.job
+		v.add_child(UiKit.label("%s%s・腕前%d" % [c.config.job_name(a.def.job), "★" if job_match else "", a.def.ability], 13, UiKit.INK))
+		v.add_child(UiKit.label(a.def.skill_name, 13, UiKit.INFO))
+
+	UiKit.clear_children(_pool_box)
+	for a: AdventurerState in c.adventurers:
+		var in_party := slots.has(a.def.id)
+		var card := VBoxContainer.new()
+		card.custom_minimum_size = Vector2(108, 0)
+		card.add_theme_constant_override("separation", 0)
+		card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_pool_box.add_child(card)
+		var p := _make_portrait(a, Vector2(76, 88), a.is_idle() and not in_party, "pool")
+		p.clicked.connect(func(id: String) -> void:
+			if can_place(id):
+				_toggle(id))
+		card.add_child(p)
+		var name_label := UiKit.label(a.def.name, 15)
+		name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		card.add_child(name_label)
+		var job_match := a.def.job == q.def.job
+		var job_label := UiKit.label("%s%s・腕前%d" % [c.config.job_name(a.def.job), "★" if job_match else "", a.def.ability], 12, UiKit.INK)
+		job_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		card.add_child(job_label)
+		var status: Array = ["パーティにいる", UiKit.INFO] if in_party else preload("res://scripts/ui/roster_panel.gd").status_text(c, a)
+		var status_label := UiKit.label(status[0], 12, status[1])
+		status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		card.add_child(status_label)
+		if in_party or not a.is_idle():
+			p.modulate = Color(1, 1, 1, 0.45)
 
 
 func _on_supply_pressed(tier: int) -> void:
@@ -237,11 +345,6 @@ func _on_supply_pressed(tier: int) -> void:
 func update_preview() -> void:
 	var c := controller
 	var q := c.quest(quest_id)
-	var full := selected_ids.size() >= c.config.party_max
-	for id: String in _checks:
-		var check: CheckBox = _checks[id]
-		check.disabled = not c.adventurer(id).is_idle() or (full and not selected_ids.has(id))
-
 	UiKit.clear_children(_modifier_box)
 	var cost := c.config.supply_cost(supply_tier)
 	_gold_label.text = "所持金 %dG → 派遣後 %dG" % [c.gold, c.gold - cost]

@@ -21,3 +21,5 @@ var skill_description: String = ""
 ##   none          : 判定への効果なし
 var skill_type: String = "none"
 var skill_value: Variant = 0
+## ポートレートの見た目（任意）。{"hair": 色, "skin": 色, "beard": bool}
+var portrait: Dictionary = {}

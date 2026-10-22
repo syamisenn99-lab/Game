@@ -38,6 +38,7 @@ func _ready() -> void:
 	controller.changed.connect(refresh)
 	top_bar.end_week_pressed.connect(_on_end_week)
 	board.quest_selected.connect(_on_quest_selected)
+	board.adventurer_dropped.connect(_on_adventurer_dropped)
 	detail.dispatch_requested.connect(func(id: String) -> void: dispatch_panel.open(id))
 	result_screen.restart_requested.connect(_on_restart)
 	refresh()
@@ -62,6 +63,12 @@ func _on_quest_selected(id: String) -> void:
 	selected_quest_id = id
 	detail.show_quest(id)
 	board.refresh(selected_quest_id)
+
+
+## 名簿のポートレートを依頼の紙に落としたら、その人を入れた状態で派遣パネルを開く
+func _on_adventurer_dropped(quest_id: String, adventurer_id: String) -> void:
+	_on_quest_selected(quest_id)
+	dispatch_panel.open(quest_id, [adventurer_id] as Array[String])
 
 
 func _on_end_week() -> void:

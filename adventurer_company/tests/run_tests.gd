@@ -35,6 +35,9 @@ func _run() -> void:
 	print("- UI：派遣から結果画面まで")
 	_current = "UI"
 	await _test_ui_flow()
+	print("- UI：ポートレートのドラッグ＆ドロップ（実際のマウス操作）")
+	_current = "UIドラッグ"
+	await _test_ui_drag()
 	print("")
 	if _failures == 0:
 		print("OK: %d checks passed" % _checks)
@@ -691,5 +694,140 @@ func _test_ui_flow() -> void:
 	await _frames(1)
 	_eq(c.week, 1, "もう一度遊ぶと第1週から")
 	_eq(c.gold, 300, "所持金も初期値")
+	main.queue_free()
+	await _frames(1)
+
+
+var _last_mouse := Vector2.ZERO
+
+
+func _mouse_motion(pos: Vector2, mask: int) -> void:
+	var ev := InputEventMouseMotion.new()
+	ev.position = pos
+	ev.global_position = pos
+	ev.relative = pos - _last_mouse
+	_last_mouse = pos
+	ev.button_mask = mask
+	root.push_input(ev)
+
+
+func _mouse_button(pos: Vector2, pressed: bool) -> void:
+	var ev := InputEventMouseButton.new()
+	ev.button_index = MOUSE_BUTTON_LEFT
+	ev.pressed = pressed
+	ev.position = pos
+	ev.global_position = pos
+	ev.button_mask = MOUSE_BUTTON_MASK_LEFT if pressed else 0
+	root.push_input(ev)
+
+
+## 実際のマウス操作で from から to へドラッグする
+func _drag(from: Control, to: Control) -> void:
+	var a := from.get_global_rect().get_center()
+	var b := to.get_global_rect().get_center()
+	_mouse_motion(a, 0)
+	await _frames(1)
+	_mouse_button(a, true)
+	await _frames(1)
+	_mouse_motion(a + Vector2(30, 0), MOUSE_BUTTON_MASK_LEFT)
+	await _frames(1)
+	_mouse_motion(b, MOUSE_BUTTON_MASK_LEFT)
+	await _frames(1)
+	_mouse_button(b, false)
+	await _frames(2)
+
+
+func _click(target: Control) -> void:
+	var a := target.get_global_rect().get_center()
+	_mouse_motion(a, 0)
+	await _frames(1)
+	_mouse_button(a, true)
+	await _frames(1)
+	_mouse_button(a, false)
+	await _frames(2)
+
+
+## node の下にある、冒険者 adventurer_id のポートレート
+func _portrait_in(node: Node, adventurer_id: String) -> Control:
+	for child in node.find_children("*", "Control", true, false):
+		if child.get_script() == preload("res://scripts/ui/portrait.gd") and child.def != null and child.def.id == adventurer_id:
+			return child
+	return null
+
+
+func _test_ui_drag() -> void:
+	root.size = Vector2i(1280, 720)
+	var main: Control = load("res://scenes/main.tscn").instantiate()
+	root.add_child(main)
+	await _frames(3)
+	var c: GameController = main.controller
+	var panel: Control = main.dispatch_panel
+	main._on_quest_selected("q01")
+	main.detail.dispatch_button.pressed.emit()
+	await _frames(2)
+
+	# 一覧 → 2番目の枠
+	await _drag(_portrait_in(panel._pool_box, "gald"), panel._slot_box.get_child(1))
+	_eq(panel.slots, ["", "gald", ""] as Array[String], "ドラッグした枠に入る")
+	_eq(panel.selected_ids, ["gald"] as Array[String], "パーティはガルド")
+	_eq(panel.rate_label.text, UiKit.percent(c.preview_probabilities(c.quest("q01"), panel.selected_ids, 0).success_rate()), "ドロップで成功率が更新される")
+	_check(not _portrait_in(panel._pool_box, "gald").draggable, "パーティにいる人は一覧からはドラッグできない")
+
+	# クリックでも入れられる（空いている左の枠から）
+	await _click(_portrait_in(panel._pool_box, "mira"))
+	_eq(panel.slots, ["mira", "gald", ""] as Array[String], "クリックで空き枠に入る")
+
+	# 枠どうしで入れ替え
+	await _drag(_portrait_in(panel._slot_box, "gald"), panel._slot_box.get_child(0))
+	_eq(panel.slots, ["gald", "mira", ""] as Array[String], "枠どうしのドラッグで入れ替わる")
+
+	# 一覧から、人のいる枠へ → 前の人は外れる
+	await _drag(_portrait_in(panel._pool_box, "tom"), panel._slot_box.get_child(1))
+	_eq(panel.slots, ["gald", "tom", ""] as Array[String], "人のいる枠に置くと入れ替わりで外れる")
+
+	# 枠から一覧へ戻す
+	await _drag(_portrait_in(panel._slot_box, "tom"), panel._pool_box)
+	_eq(panel.slots, ["gald", "", ""] as Array[String], "一覧へドラッグすると外れる")
+
+	# 枠のポートレートをクリックしても外れる
+	await _click(_portrait_in(panel._slot_box, "gald"))
+	_eq(panel.selected_ids.size(), 0, "枠のクリックで外れる")
+	_check(panel.confirm_button.disabled, "誰もいなければ派遣できない")
+
+	# 派遣して、派遣中の人はドラッグできない
+	await _drag(_portrait_in(panel._pool_box, "oswald"), panel._slot_box.get_child(0))
+	panel.confirm_button.pressed.emit()
+	await _frames(2)
+	_eq(c.quest("q01").party_ids, ["oswald"] as Array[String], "ドラッグで選んだ人が派遣される")
+	main._on_quest_selected("q03")
+	main.detail.dispatch_button.pressed.emit()
+	await _frames(2)
+	_check(not _portrait_in(panel._pool_box, "oswald").draggable, "派遣中の人はドラッグできない")
+	await _drag(_portrait_in(panel._pool_box, "oswald"), panel._slot_box.get_child(0))
+	_eq(panel.selected_ids.size(), 0, "派遣中の人は枠に入らない")
+	await _click(_portrait_in(panel._pool_box, "oswald"))
+	_eq(panel.selected_ids.size(), 0, "派遣中の人はクリックしても入らない")
+	panel.cancel_button.pressed.emit()
+	await _frames(2)
+
+	# 名簿のポートレートを掲示板の紙へ → その人が入った派遣パネルが開く
+	var paper: Control = null
+	for child in main.board._grid.get_children():
+		if child.quest_id == "q02":
+			paper = child
+	await _drag(_portrait_in(main.roster, "lina"), paper)
+	_check(panel.visible, "紙に落とすと派遣パネルが開く")
+	_eq(panel.quest_id, "q02", "落とした紙の依頼")
+	_eq(panel.selected_ids, ["lina"] as Array[String], "落とした人が入っている")
+	_eq(main.selected_quest_id, "q02", "その依頼が選ばれる")
+	panel.cancel_button.pressed.emit()
+	await _frames(2)
+	# 受注中の紙や、派遣中の人は落とせない
+	for child in main.board._grid.get_children():
+		if child.quest_id == "q01":
+			paper = child
+	await _drag(_portrait_in(main.roster, "lina"), paper)
+	_check(not panel.visible, "受注中の依頼には落とせない")
+	_check(not _portrait_in(main.roster, "oswald").draggable, "名簿でも派遣中の人はドラッグできない")
 	main.queue_free()
 	await _frames(1)

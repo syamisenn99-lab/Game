@@ -1,5 +1,8 @@
 extends PanelContainer
 ## 画面下部の会社の名簿。冒険者全員の状態を常に見せる。
+## 待機中の冒険者のポートレートは、掲示板の依頼の紙へドラッグして派遣パネルを開ける。
+
+const Portrait := preload("res://scripts/ui/portrait.gd")
 
 var controller: GameController
 var _title: Label
@@ -31,16 +34,21 @@ func refresh() -> void:
 		var card := PanelContainer.new()
 		card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		card.add_theme_stylebox_override("panel", UiKit.box(UiKit.PARCHMENT, UiKit.WOOD_DARK, 2, 4, 8))
+		var h := HBoxContainer.new()
+		h.add_theme_constant_override("separation", 6)
+		card.add_child(h)
+		var portrait: Control = Portrait.new()
+		portrait.custom_minimum_size = Vector2(56, 70)
+		portrait.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+		portrait.setup(a.def, c.config.job_name(a.def.job), a.is_idle() and c.phase == GameController.Phase.PLANNING, "roster")
+		h.add_child(portrait)
 		var v := VBoxContainer.new()
-		v.add_theme_constant_override("separation", 1)
-		card.add_child(v)
-		var head := HBoxContainer.new()
-		head.add_child(UiKit.label(a.def.name, 17))
-		head.add_child(UiKit.label("%s　腕前%d" % [c.config.job_name(a.def.job), a.def.ability], 14, UiKit.INK_SOFT))
-		v.add_child(head)
-		v.add_child(UiKit.label("月給 %dG" % c.salary_for(a), 13, UiKit.INK_SOFT))
-		var skill := UiKit.label("%s：%s" % [a.def.skill_name, a.def.skill_description], 12, UiKit.INK, true)
-		skill.custom_minimum_size = Vector2(220, 0)
+		v.add_theme_constant_override("separation", 0)
+		h.add_child(v)
+		v.add_child(UiKit.label(a.def.name, 17))
+		v.add_child(UiKit.label("%s・腕前%d・月給%dG" % [c.config.job_name(a.def.job), a.def.ability, c.salary_for(a)], 12, UiKit.INK_SOFT))
+		var skill := UiKit.label("%s：%s" % [a.def.skill_name, a.def.skill_description], 11, UiKit.INK, true)
+		skill.custom_minimum_size = Vector2(160, 0)
 		v.add_child(skill)
 		var status := status_text(c, a)
 		v.add_child(UiKit.label(status[0], 14, status[1]))

@@ -2,6 +2,10 @@ extends Control
 ## 掲示板に貼られた依頼の紙1枚。少し傾いた紙に、名前・報酬・期間を書く。受注中はスタンプを押す。
 
 signal pressed(quest_id: String)
+## 名簿のポートレートがこの紙に落とされた
+signal adventurer_dropped(quest_id: String, adventurer_id: String)
+
+const Portrait := preload("res://scripts/ui/portrait.gd")
 
 const SLOT_SIZE := Vector2(240, 150)
 const PAPER_SIZE := Vector2(214, 128)
@@ -9,6 +13,9 @@ const PAPER_SIZE := Vector2(214, 128)
 const STANDING_PAPER := Color("dfe3cf")
 
 var quest_id: String = ""
+var _controller: GameController
+var _border_color: Color
+var _border_width: int
 var _paper: Panel
 var _stamp: Label
 var _style: StyleBoxFlat
@@ -21,6 +28,7 @@ func _init() -> void:
 
 func setup(c: GameController, q: QuestState, selected: bool) -> void:
 	quest_id = q.def.id
+	_controller = c
 	var locked := q.status == QuestState.Status.POSTED and not c.is_unlocked(q)
 	var in_progress := q.status == QuestState.Status.IN_PROGRESS
 
@@ -38,6 +46,8 @@ func setup(c: GameController, q: QuestState, selected: bool) -> void:
 		_style.border_color = Color("e0b84f")
 		_style.set_border_width_all(4)
 	_paper.add_theme_stylebox_override("panel", _style)
+	_border_color = _style.border_color
+	_border_width = _style.border_width_left
 	add_child(_paper)
 
 	var pin := Panel.new()
@@ -87,6 +97,30 @@ func setup(c: GameController, q: QuestState, selected: bool) -> void:
 		_stamp.position = Vector2(PAPER_SIZE.x - 108, PAPER_SIZE.y - 50)
 		_stamp.rotation_degrees = -14
 		_paper.add_child(_stamp)
+
+
+func _can_drop_data(_at_position: Vector2, data: Variant) -> bool:
+	var ok: bool = Portrait.is_adventurer_drag(data) and data["source"] == "roster" \
+		and _controller.dispatch_error(_controller.quest(quest_id), [str(data["id"])] as Array[String], 0) == ""
+	_set_highlight(ok)
+	return ok
+
+
+func _drop_data(_at_position: Vector2, data: Variant) -> void:
+	_set_highlight(false)
+	adventurer_dropped.emit(quest_id, str(data["id"]))
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_DRAG_END or what == NOTIFICATION_MOUSE_EXIT:
+		_set_highlight(false)
+
+
+func _set_highlight(on: bool) -> void:
+	if _style == null:
+		return
+	_style.border_color = Color("5f9e3a") if on else _border_color
+	_style.set_border_width_all(4 if on else _border_width)
 
 
 func _gui_input(event: InputEvent) -> void:

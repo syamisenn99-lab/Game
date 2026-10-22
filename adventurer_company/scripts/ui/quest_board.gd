@@ -2,6 +2,7 @@ extends Control
 ## 左側の掲示板。木の板の上に依頼の紙を並べる。
 
 signal quest_selected(quest_id: String)
+signal adventurer_dropped(quest_id: String, adventurer_id: String)
 
 const QuestPaper := preload("res://scripts/ui/quest_paper.gd")
 
@@ -66,4 +67,5 @@ func refresh(selected_id: String) -> void:
 		var paper := QuestPaper.new()
 		paper.setup(controller, q, q.def.id == selected_id)
 		paper.pressed.connect(func(id: String) -> void: quest_selected.emit(id))
+		paper.adventurer_dropped.connect(func(id: String, adventurer_id: String) -> void: adventurer_dropped.emit(id, adventurer_id))
 		_grid.add_child(paper)

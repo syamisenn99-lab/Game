@@ -5,6 +5,8 @@ signal pressed(quest_id: String)
 
 const SLOT_SIZE := Vector2(240, 150)
 const PAPER_SIZE := Vector2(214, 128)
+## 常設依頼の紙の色（ギルドが貼りっぱなしにしている少し古びた紙）
+const STANDING_PAPER := Color("dfe3cf")
 
 var quest_id: String = ""
 var _paper: Panel
@@ -28,7 +30,7 @@ func setup(c: GameController, q: QuestState, selected: bool) -> void:
 	_paper.pivot_offset = PAPER_SIZE / 2
 	_paper.rotation_degrees = float(hash(quest_id) % 7 - 3) * 0.9
 	_paper.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_style = UiKit.box(UiKit.PAPER, Color("b89f6e"), 1, 2, 0)
+	_style = UiKit.box(STANDING_PAPER if q.def.repeatable else UiKit.PAPER, Color("b89f6e"), 1, 2, 0)
 	_style.shadow_color = Color(0, 0, 0, 0.35)
 	_style.shadow_size = 4
 	_style.shadow_offset = Vector2(2, 3)
@@ -60,9 +62,18 @@ func setup(c: GameController, q: QuestState, selected: bool) -> void:
 		text.add_child(UiKit.label("評判%dで受注可" % q.def.required_reputation, 14, UiKit.BAD))
 	elif in_progress:
 		text.add_child(UiKit.label("残り%d週" % q.weeks_left, 14, UiKit.INFO))
+	elif q.def.repeatable:
+		var cap_text := "評判は%dまで上がる" % q.def.reputation_cap if q.def.reputation_cap >= 0 else "何度でも受けられる"
+		text.add_child(UiKit.label(cap_text, 13, UiKit.INK_SOFT))
 	else:
 		var left := c.last_listed_week(q) - c.week
 		text.add_child(UiKit.label("掲示は今週まで" if left == 0 else "掲示あと%d週" % (left + 1), 13, UiKit.INK_SOFT))
+
+	if q.def.repeatable:
+		var badge := UiKit.label("常設", 12, UiKit.CREAM)
+		badge.add_theme_stylebox_override("normal", UiKit.box(Color("4f6b3a"), Color("2f4520"), 1, 3, 3))
+		badge.position = Vector2(PAPER_SIZE.x - 44, 6)
+		_paper.add_child(badge)
 
 	if locked:
 		_paper.modulate = Color(0.62, 0.62, 0.62)

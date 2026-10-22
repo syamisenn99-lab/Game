@@ -663,6 +663,13 @@ func _test_ui_flow() -> void:
 	_check(not panel.visible, "派遣すると閉じる")
 	_eq(c.quest("q01").status, QuestState.Status.IN_PROGRESS, "受注中になる")
 	_eq(c.gold, 240, "支度金60Gを払った")
+	main.dispatch_panel.open("s01")
+	main.dispatch_panel.set_adventurer("gald", true)
+	_eq(main.dispatch_panel.selected_ids.size(), 0, "派遣中の冒険者は選べない")
+	main.dispatch_panel.set_adventurer("tom", true)
+	_eq(main.dispatch_panel.selected_ids, ["tom"] as Array[String], "待機中の冒険者は選べる")
+	main.dispatch_panel.cancel_button.pressed.emit()
+	_eq(c.quest("s01").status, QuestState.Status.POSTED, "キャンセルなら派遣しない")
 
 	# 週を終える → 結果レポート → （負傷）→ 次の週。最後まで進めて結果画面を出す
 	var guard := 0

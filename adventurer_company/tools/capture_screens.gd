@@ -43,6 +43,13 @@ func _run() -> void:
 	_main._on_quest_selected("q01")
 	await _shot("05_in_progress")
 
+	_main._on_quest_selected("s01")
+	await _shot("05a_standing_detail")
+	dispatch.open("s01")
+	dispatch.set_adventurer("tom", true)
+	await _shot("05b_standing_dispatch")
+	dispatch.cancel_button.pressed.emit()
+
 	var shots := 6
 	var guard := 0
 	while not _main.result_screen.visible and guard < 200:

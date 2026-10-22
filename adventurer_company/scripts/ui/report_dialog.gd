@@ -98,6 +98,8 @@ func _entry_panel(c: GameController, e: QuestReportEntry) -> Control:
 	if e.reward > 0:
 		money += "（基本 %dG × %d%%）" % [e.base_reward, roundi(check.outcome.reward_rate * 100)]
 	money += " ／ 評判 %s" % UiKit.signed(e.reputation_delta)
+	if e.reputation_capped:
+		money += "（この依頼で上がる評判は%dまで）" % c.quest(e.quest_id).def.reputation_cap
 	v.add_child(UiKit.label(money, 17, UiKit.GOOD if e.reward > 0 else UiKit.BAD))
 	if e.injury != null:
 		v.add_child(UiKit.label("負傷：%sが%s（休養%d週）" % [e.injury.adventurer_name, e.injury.injury_name, e.injury.rest_weeks], 16, UiKit.WARN))

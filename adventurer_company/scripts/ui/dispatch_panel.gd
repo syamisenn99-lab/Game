@@ -150,6 +150,8 @@ func open(id: String) -> void:
 	_title.text = "派遣：%s" % q.def.name
 	_subtitle.text = "難易度 %d ／ 推奨職業 %s ／ 期間 %d週 ／ 報酬 %dG" % [
 		q.def.difficulty, c.config.job_name(q.def.job), q.def.weeks, q.def.reward]
+	if q.def.reputation_cap >= 0:
+		_subtitle.text += " ／ 評判は%dまで（いま %d）" % [q.def.reputation_cap, c.reputation]
 
 	UiKit.clear_children(_adventurer_box)
 	_checks.clear()
@@ -218,7 +220,7 @@ func set_supply(tier: int) -> void:
 
 func _on_adventurer_toggled(on: bool, adventurer_id: String) -> void:
 	if on and not selected_ids.has(adventurer_id):
-		if selected_ids.size() >= controller.config.party_max:
+		if not controller.adventurer(adventurer_id).is_idle() or selected_ids.size() >= controller.config.party_max:
 			(_checks[adventurer_id] as CheckBox).set_pressed_no_signal(false)
 			return
 		selected_ids.append(adventurer_id)

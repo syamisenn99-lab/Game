@@ -60,6 +60,8 @@ func refresh() -> void:
 	grid.add_theme_constant_override("v_separation", 6)
 	_content.add_child(grid)
 	var rep_ok := c.is_unlocked(q)
+	if d.repeatable:
+		_content.add_child(UiKit.label("常設依頼：完了しても掲示板に残り、次の週からまた受けられる（同時に受けられるのは1組だけ）。", 14, UiKit.INFO, true))
 	var rows := [
 		["難易度", str(d.difficulty), UiKit.INK],
 		["期間", "%d週" % d.weeks, UiKit.INK],
@@ -74,9 +76,16 @@ func refresh() -> void:
 		rows.append(["状態", "受注中（残り%d週）" % q.weeks_left, UiKit.INFO])
 		rows.append(["パーティ", "、".join(names), UiKit.INK])
 		rows.append(["支度金", "%dG" % c.config.supply_cost(q.supply_tier), UiKit.INK])
+	elif d.repeatable:
+		rows.append(["掲示期限", "なし（常設）", UiKit.INK])
 	else:
 		var left := c.last_listed_week(q) - c.week
 		rows.append(["掲示期限", "今週まで" if left == 0 else "第%d週まで" % c.last_listed_week(q), UiKit.INK])
+	if d.reputation_cap >= 0:
+		var room := maxi(0, d.reputation_cap - c.reputation)
+		rows.append(["評判の上限", "%dまで（いまなら最大 +%d）" % [d.reputation_cap, room], UiKit.INK if room > 0 else UiKit.WARN])
+	if d.repeatable and q.times_completed > 0:
+		rows.append(["完了した回数", "%d回" % q.times_completed, UiKit.INK])
 	for row: Array in rows:
 		grid.add_child(UiKit.label(str(row[0]), 16, UiKit.INK_SOFT))
 		grid.add_child(UiKit.label(str(row[1]), 17, row[2]))

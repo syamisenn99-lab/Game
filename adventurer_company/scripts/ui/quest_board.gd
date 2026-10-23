@@ -33,7 +33,7 @@ func _ready() -> void:
 	var plaque := PanelContainer.new()
 	plaque.add_theme_stylebox_override("panel", UiKit.box(UiKit.WOOD_DARK, Color("2e1d0e"), 2, 4, 6))
 	plaque.position = Vector2(20, 12)
-	plaque.add_child(UiKit.label("冒険者ギルド　依頼掲示板", 18, UiKit.CREAM))
+	plaque.add_child(UiKit.bold("冒険者ギルド　依頼掲示板", UiKit.SIZE_HEADING, UiKit.CREAM))
 	add_child(plaque)
 
 	var scroll := ScrollContainer.new()
@@ -47,10 +47,10 @@ func _ready() -> void:
 	_grid = GridContainer.new()
 	_grid.columns = 3
 	_grid.add_theme_constant_override("h_separation", 4)
-	_grid.add_theme_constant_override("v_separation", 2)
+	_grid.add_theme_constant_override("v_separation", 0)
 	scroll.add_child(_grid)
 
-	_empty_label = UiKit.label("いま掲示されている依頼はない。", 18, UiKit.CREAM)
+	_empty_label = UiKit.label("いま掲示されている依頼はない。", UiKit.SIZE_HEADING, UiKit.CREAM)
 	_empty_label.position = Vector2(40, 90)
 	add_child(_empty_label)
 

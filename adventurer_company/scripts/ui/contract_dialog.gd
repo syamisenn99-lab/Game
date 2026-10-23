@@ -18,11 +18,11 @@ var buttons: Dictionary = {}
 func _ready() -> void:
 	visible = false
 	var body := UiKit.make_modal(self, Vector2(940, 600))
-	_title = UiKit.label("", 24)
+	_title = UiKit.bold("", UiKit.SIZE_TITLE)
 	body.add_child(_title)
 	var note := UiKit.label("専属は給料日に月給を払う代わりに、報酬は全部会社のもの。歩合は月給なしで、依頼の報酬から本人の取り分を払う。\n"
 		+ "歩合の人は、その月の稼ぎが月給の半分に届かないと不満がたまり、2か月続くと辞める。専属から歩合に切り替えた人は、最初から不満を1つ抱える。",
-		14, UiKit.INK_SOFT, true)
+		UiKit.SIZE_SMALL, UiKit.INK, true)
 	note.custom_minimum_size = Vector2(900, 0)
 	body.add_child(note)
 	body.add_child(HSeparator.new())
@@ -34,9 +34,9 @@ func _ready() -> void:
 	var footer := HBoxContainer.new()
 	footer.add_theme_constant_override("separation", 12)
 	body.add_child(footer)
-	_summary = UiKit.label("", 17)
+	_summary = UiKit.bold("", 17)
 	footer.add_child(_summary)
-	_error_label = UiKit.label("", 15, UiKit.BAD)
+	_error_label = UiKit.bold("", UiKit.SIZE_SMALL, UiKit.BAD)
 	_error_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_error_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	footer.add_child(_error_label)
@@ -85,8 +85,12 @@ func _rebuild() -> void:
 		var info := VBoxContainer.new()
 		info.custom_minimum_size = Vector2(180, 0)
 		h.add_child(info)
-		info.add_child(UiKit.label(a.def.name, 17))
-		info.add_child(UiKit.label("%s・腕前%d" % [c.config.job_name(a.def.job), a.def.ability], 13, UiKit.INK_SOFT))
+		info.add_child(UiKit.bold(a.def.name, 17))
+		var job_row := HBoxContainer.new()
+		job_row.add_theme_constant_override("separation", 6)
+		info.add_child(job_row)
+		job_row.add_child(UiKit.job_chip(c.config, a.def.job, false, UiKit.SIZE_TINY))
+		job_row.add_child(UiKit.label("腕前%d" % a.def.ability, UiKit.SIZE_SMALL))
 		var group := ButtonGroup.new()
 		var pair := {}
 		for type_id: String in ["regular", "commission"]:
@@ -102,7 +106,7 @@ func _rebuild() -> void:
 			h.add_child(b)
 			pair[type_id] = b
 		buttons[a.def.id] = pair
-		var status := UiKit.label(_status(a), 13, UiKit.BAD if a.left or a.discontent > 0 else UiKit.INK_SOFT, true)
+		var status := UiKit.label(_status(a), UiKit.SIZE_TINY, UiKit.BAD if a.left or a.discontent > 0 else UiKit.INK_SOFT, true)
 		status.custom_minimum_size = Vector2(240, 0)
 		status.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		h.add_child(status)

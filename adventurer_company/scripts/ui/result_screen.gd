@@ -12,10 +12,10 @@ var restart_button: Button
 func _ready() -> void:
 	visible = false
 	var body := UiKit.make_modal(self, Vector2(620, 420))
-	_title = UiKit.label("", 40)
+	_title = UiKit.bold("", 40)
 	_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	body.add_child(_title)
-	_reason = UiKit.label("", 17, UiKit.INK_SOFT, true)
+	_reason = UiKit.label("", 17, UiKit.INK, true)
 	_reason.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	body.add_child(_reason)
 	body.add_child(HSeparator.new())
@@ -54,7 +54,7 @@ func open(c: GameController) -> void:
 		var name_label := UiKit.label(str(row[0]), 22, UiKit.INK_SOFT)
 		name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		h.add_child(name_label)
-		h.add_child(UiKit.label(str(row[1]), 26))
+		h.add_child(UiKit.bold(str(row[1]), 26))
 		_stats.add_child(h)
 	visible = true
 

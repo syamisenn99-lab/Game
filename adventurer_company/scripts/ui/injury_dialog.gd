@@ -14,11 +14,11 @@ var skip_button: Button
 func _ready() -> void:
 	visible = false
 	var body := UiKit.make_modal(self, Vector2(640, 300))
-	body.add_child(UiKit.label("負傷者が出た", 24, UiKit.WARN))
+	body.add_child(UiKit.bold("負傷者が出た", UiKit.SIZE_TITLE, UiKit.BAD))
 	body.add_child(HSeparator.new())
-	_text = UiKit.label("", 18, UiKit.INK, true)
+	_text = UiKit.bold("", 18, UiKit.INK, true)
 	body.add_child(_text)
-	_note = UiKit.label("", 15, UiKit.INK_SOFT, true)
+	_note = UiKit.label("", UiKit.SIZE_BODY, UiKit.INK_SOFT, true)
 	body.add_child(_note)
 	var spacer := Control.new()
 	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL

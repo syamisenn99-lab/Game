@@ -34,12 +34,12 @@ color = Color(0.168627, 0.129412, 0.094118, 1)
 [node name="TopBar" type="PanelContainer" parent="."]
 layout_mode = 0
 offset_right = 1280.0
-offset_bottom = 56.0
+offset_bottom = 64.0
 script = ExtResource("2_top")
 
 [node name="Board" type="Control" parent="."]
 layout_mode = 0
-offset_top = 56.0
+offset_top = 64.0
 offset_right = 760.0
 offset_bottom = 552.0
 script = ExtResource("3_board")
@@ -47,7 +47,7 @@ script = ExtResource("3_board")
 [node name="Detail" type="PanelContainer" parent="."]
 layout_mode = 0
 offset_left = 760.0
-offset_top = 56.0
+offset_top = 64.0
 offset_right = 1280.0
 offset_bottom = 552.0
 script = ExtResource("4_detail")

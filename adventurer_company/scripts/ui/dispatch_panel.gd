@@ -41,9 +41,9 @@ var cancel_button: Button
 func _ready() -> void:
 	visible = false
 	var body := UiKit.make_modal(self, Vector2(1060, 640))
-	_title = UiKit.label("", 24)
+	_title = UiKit.bold("", UiKit.SIZE_TITLE)
 	body.add_child(_title)
-	_subtitle = UiKit.label("", 16, UiKit.INK_SOFT)
+	_subtitle = UiKit.label("", UiKit.SIZE_BODY, UiKit.INK)
 	body.add_child(_subtitle)
 	body.add_child(HSeparator.new())
 
@@ -56,11 +56,11 @@ func _ready() -> void:
 	left.custom_minimum_size = Vector2(600, 0)
 	left.add_theme_constant_override("separation", 6)
 	cols.add_child(left)
-	left.add_child(UiKit.label("パーティ（ポートレートをここへドラッグ・1〜3人）", 17))
+	left.add_child(UiKit.heading("パーティ（ポートレートをここへドラッグ・1〜3人）", UiKit.SIZE_BODY))
 	_slot_box = HBoxContainer.new()
 	_slot_box.add_theme_constant_override("separation", 10)
 	left.add_child(_slot_box)
-	left.add_child(UiKit.label("冒険者（待機中の人をドラッグ、またはクリックで出し入れ）", 15, UiKit.INK_SOFT))
+	left.add_child(UiKit.label("冒険者（待機中の人をドラッグ、またはクリックで出し入れ）", UiKit.SIZE_SMALL, UiKit.INK_SOFT))
 	var pool: Control = DropTarget.new()
 	pool.setup(UiKit.box(Color("efe5cc"), Color("d8c8a6"), 1, 6, 6), UiKit.box(Color("f6edd6"), Color("c9a24a"), 2, 6, 6),
 		func(data: Variant) -> bool: return Portrait.is_adventurer_drag(data) and data["source"] == "slot",
@@ -69,10 +69,10 @@ func _ready() -> void:
 	_pool_box = HBoxContainer.new()
 	_pool_box.add_theme_constant_override("separation", 8)
 	pool.add_child(_pool_box)
-	_hint_label = UiKit.label("", 13, UiKit.INK_SOFT, true)
+	_hint_label = UiKit.label("", UiKit.SIZE_SMALL, UiKit.INK, true)
 	_hint_label.custom_minimum_size = Vector2(600, 36)
 	left.add_child(_hint_label)
-	left.add_child(UiKit.label("支度金（派遣時に支払う。失敗しても戻らない）", 17))
+	left.add_child(UiKit.heading("支度金（派遣時に支払う。失敗しても戻らない）", UiKit.SIZE_BODY))
 	_supply_box = HBoxContainer.new()
 	_supply_box.add_theme_constant_override("separation", 8)
 	left.add_child(_supply_box)
@@ -93,25 +93,25 @@ func _ready() -> void:
 	var rv := VBoxContainer.new()
 	rv.add_theme_constant_override("separation", 4)
 	right.add_child(rv)
-	rv.add_child(UiKit.label("成功率（辛勝以上）", 16, UiKit.INK_SOFT))
-	rate_label = UiKit.label("—", 54)
+	rv.add_child(UiKit.heading("成功率（辛勝以上）", UiKit.SIZE_BODY))
+	rate_label = UiKit.bold("—", 54)
 	rv.add_child(rate_label)
 	var grid := GridContainer.new()
 	grid.columns = 3
 	grid.add_theme_constant_override("h_separation", 10)
 	rv.add_child(grid)
-	_notes_label = UiKit.label("", 13, UiKit.INFO, true)
+	_notes_label = UiKit.label("", UiKit.SIZE_SMALL, UiKit.INFO, true)
 	_notes_label.custom_minimum_size = Vector2(RIGHT_WIDTH, 0)
 	rv.add_child(_notes_label)
 	rv.add_child(HSeparator.new())
-	rv.add_child(UiKit.label("補正の内訳", 15, UiKit.INK_SOFT))
+	rv.add_child(UiKit.heading("補正の内訳"))
 	_modifier_box = VBoxContainer.new()
 	_modifier_box.add_theme_constant_override("separation", 0)
 	rv.add_child(_modifier_box)
-	_need_label = UiKit.label("", 14, UiKit.INK, true)
+	_need_label = UiKit.bold("", UiKit.SIZE_SMALL, UiKit.INK, true)
 	_need_label.custom_minimum_size = Vector2(RIGHT_WIDTH, 0)
 	rv.add_child(_need_label)
-	_expected_label = UiKit.label("", 14, UiKit.INK_SOFT, true)
+	_expected_label = UiKit.label("", UiKit.SIZE_SMALL, UiKit.GOLD, true)
 	_expected_label.custom_minimum_size = Vector2(RIGHT_WIDTH, 0)
 	rv.add_child(_expected_label)
 	# 5段階の行は setup のあと（設定から段階を読む）に作るので、grid を覚えておく
@@ -121,9 +121,9 @@ func _ready() -> void:
 	var footer := HBoxContainer.new()
 	footer.add_theme_constant_override("separation", 12)
 	body.add_child(footer)
-	_gold_label = UiKit.label("", 17)
+	_gold_label = UiKit.bold("", 17)
 	footer.add_child(_gold_label)
-	_error_label = UiKit.label("", 15, UiKit.BAD)
+	_error_label = UiKit.bold("", UiKit.SIZE_SMALL, UiKit.BAD)
 	_error_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_error_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	footer.add_child(_error_label)
@@ -141,7 +141,7 @@ func setup(c: GameController) -> void:
 	controller = c
 	var grid: GridContainer = get_meta("outcome_grid")
 	for o: OutcomeDef in c.config.outcomes:
-		grid.add_child(UiKit.label(o.name, 15, UiKit.outcome_color(o.id)))
+		grid.add_child(UiKit.bold(o.name, UiKit.SIZE_SMALL, UiKit.outcome_color(o.id)))
 		var track := ColorRect.new()
 		track.color = Color("e6dcc4")
 		track.custom_minimum_size = Vector2(BAR_WIDTH, 14)
@@ -151,7 +151,7 @@ func setup(c: GameController) -> void:
 		fill.size = Vector2(0, 14)
 		track.add_child(fill)
 		grid.add_child(track)
-		var pct := UiKit.label("", 15)
+		var pct := UiKit.bold("", UiKit.SIZE_SMALL)
 		pct.custom_minimum_size = Vector2(70, 0)
 		pct.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		grid.add_child(pct)
@@ -288,7 +288,7 @@ func _rebuild_party() -> void:
 			func(data: Variant) -> void: place_adventurer(str(data["id"]), i))
 		_slot_box.add_child(slot)
 		if slots[i] == "":
-			var empty := UiKit.label("空き\nここにドラッグ", 14, Color("a8987a"))
+			var empty := UiKit.label("空き\nここにドラッグ", UiKit.SIZE_SMALL, Color("8f7d5c"))
 			empty.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			empty.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 			slot.add_child(empty)
@@ -304,18 +304,24 @@ func _rebuild_party() -> void:
 		var v := VBoxContainer.new()
 		v.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		h.add_child(v)
-		v.add_child(UiKit.label(a.def.name, 16))
+		v.add_theme_constant_override("separation", 2)
+		v.add_child(UiKit.bold(a.def.name, UiKit.SIZE_BODY))
 		var job_match := a.def.job == q.def.job
-		v.add_child(UiKit.label("%s%s・腕前%d" % [c.config.job_name(a.def.job), "★" if job_match else "", a.def.ability], 13, UiKit.INK))
-		v.add_child(UiKit.label(a.def.skill_name, 13, UiKit.INFO))
+		var job_row := HBoxContainer.new()
+		job_row.add_theme_constant_override("separation", 4)
+		job_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		v.add_child(job_row)
+		job_row.add_child(UiKit.job_chip(c.config, a.def.job, job_match, UiKit.SIZE_TINY))
+		job_row.add_child(UiKit.label("腕前%d" % a.def.ability, UiKit.SIZE_TINY, UiKit.INK))
+		v.add_child(UiKit.label(a.def.skill_name, UiKit.SIZE_TINY, UiKit.INFO))
 		if a.is_commission():
-			v.add_child(UiKit.label("歩合 %d%%" % roundi(a.def.commission_rate * 100), 13, UiKit.WARN))
+			v.add_child(UiKit.bold("歩合 %d%%" % roundi(a.def.commission_rate * 100), UiKit.SIZE_TINY, UiKit.WARN))
 
 	UiKit.clear_children(_pool_box)
 	for a: AdventurerState in c.adventurers:
 		var in_party := slots.has(a.def.id)
 		var card := VBoxContainer.new()
-		card.custom_minimum_size = Vector2(108, 0)
+		card.custom_minimum_size = Vector2(112, 0)
 		card.add_theme_constant_override("separation", 0)
 		card.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_pool_box.add_child(card)
@@ -324,15 +330,19 @@ func _rebuild_party() -> void:
 			if can_place(id):
 				_toggle(id))
 		card.add_child(p)
-		var name_label := UiKit.label(a.def.name, 15)
+		var name_label := UiKit.bold(a.def.name, UiKit.SIZE_SMALL)
 		name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		card.add_child(name_label)
 		var job_match := a.def.job == q.def.job
-		var job_label := UiKit.label("%s%s・腕前%d" % [c.config.job_name(a.def.job), "★" if job_match else "", a.def.ability], 12, UiKit.INK)
-		job_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		card.add_child(job_label)
+		var job_row := HBoxContainer.new()
+		job_row.alignment = BoxContainer.ALIGNMENT_CENTER
+		job_row.add_theme_constant_override("separation", 4)
+		job_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		card.add_child(job_row)
+		job_row.add_child(UiKit.job_chip(c.config, a.def.job, job_match, UiKit.SIZE_TINY))
+		job_row.add_child(UiKit.label("腕前%d" % a.def.ability, UiKit.SIZE_TINY, UiKit.INK))
 		var status: Array = ["パーティにいる", UiKit.INFO] if in_party else preload("res://scripts/ui/roster_panel.gd").status_text(c, a)
-		var status_label := UiKit.label(status[0], 12, status[1])
+		var status_label := UiKit.bold(status[0], UiKit.SIZE_TINY, status[1])
 		status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		card.add_child(status_label)
 		if in_party or not a.is_idle():
@@ -361,7 +371,7 @@ func update_preview() -> void:
 			(_outcome_rows[id]["fill"] as ColorRect).size.x = 0
 			(_outcome_rows[id]["pct"] as Label).text = "—"
 		_notes_label.text = ""
-		_modifier_box.add_child(UiKit.label("冒険者を選ぶと、ここに内訳が出る。", 14, UiKit.INK_SOFT))
+		_modifier_box.add_child(UiKit.label("冒険者を選ぶと、ここに内訳が出る。", UiKit.SIZE_SMALL, UiKit.INK_SOFT))
 		_need_label.text = ""
 		_expected_label.text = ""
 		return
@@ -379,16 +389,16 @@ func update_preview() -> void:
 
 	for item: Dictionary in mods.items:
 		var row := HBoxContainer.new()
-		var name_label := UiKit.label(str(item["label"]), 14)
+		var name_label := UiKit.label(str(item["label"]), UiKit.SIZE_SMALL)
 		name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		row.add_child(name_label)
-		row.add_child(UiKit.label(UiKit.signed(int(item["value"])), 14))
+		row.add_child(UiKit.bold(UiKit.signed(int(item["value"])), UiKit.SIZE_SMALL))
 		_modifier_box.add_child(row)
 	var total_row := HBoxContainer.new()
-	var total_name := UiKit.label("合計", 15)
+	var total_name := UiKit.bold("合計", UiKit.SIZE_BODY)
 	total_name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	total_row.add_child(total_name)
-	total_row.add_child(UiKit.label(UiKit.signed(mods.total_bonus()), 15))
+	total_row.add_child(UiKit.bold(UiKit.signed(mods.total_bonus()), UiKit.SIZE_BODY))
 	_modifier_box.add_child(total_row)
 
 	var success_def := c.config.outcome_by_id(c.config.success_outcome)

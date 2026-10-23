@@ -11,10 +11,11 @@ var ok_button: Button
 func _ready() -> void:
 	visible = false
 	var body := UiKit.make_modal(self, Vector2(560, 260))
-	_title = UiKit.label("", 24)
+	_title = UiKit.bold("", UiKit.SIZE_TITLE)
 	body.add_child(_title)
 	body.add_child(HSeparator.new())
 	_text = UiKit.label("", 17, UiKit.INK, true)
+	_text.add_theme_constant_override("line_spacing", 6)
 	_text.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	body.add_child(_text)
 	ok_button = UiKit.button("OK", 18)

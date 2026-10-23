@@ -1,0 +1,120 @@
+[gd_scene load_steps=12 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/main.gd" id="1_main"]
+[ext_resource type="Script" path="res://scripts/ui/top_bar.gd" id="2_top"]
+[ext_resource type="Script" path="res://scripts/ui/quest_board.gd" id="3_board"]
+[ext_resource type="Script" path="res://scripts/ui/quest_detail.gd" id="4_detail"]
+[ext_resource type="Script" path="res://scripts/ui/roster_panel.gd" id="5_roster"]
+[ext_resource type="Script" path="res://scripts/ui/dispatch_panel.gd" id="6_dispatch"]
+[ext_resource type="Script" path="res://scripts/ui/report_dialog.gd" id="7_report"]
+[ext_resource type="Script" path="res://scripts/ui/injury_dialog.gd" id="8_injury"]
+[ext_resource type="Script" path="res://scripts/ui/message_dialog.gd" id="9_message"]
+[ext_resource type="Script" path="res://scripts/ui/result_screen.gd" id="10_result"]
+[ext_resource type="Script" path="res://scripts/ui/contract_dialog.gd" id="11_contract"]
+
+[node name="Main" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_main")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.168627, 0.129412, 0.094118, 1)
+
+[node name="TopBar" type="PanelContainer" parent="."]
+layout_mode = 0
+offset_right = 1280.0
+offset_bottom = 64.0
+script = ExtResource("2_top")
+
+[node name="Board" type="Control" parent="."]
+layout_mode = 0
+offset_top = 64.0
+offset_right = 760.0
+offset_bottom = 552.0
+script = ExtResource("3_board")
+
+[node name="Detail" type="PanelContainer" parent="."]
+layout_mode = 0
+offset_left = 760.0
+offset_top = 64.0
+offset_right = 1280.0
+offset_bottom = 552.0
+script = ExtResource("4_detail")
+
+[node name="Roster" type="PanelContainer" parent="."]
+layout_mode = 0
+offset_top = 552.0
+offset_right = 1280.0
+offset_bottom = 720.0
+script = ExtResource("5_roster")
+
+[node name="DispatchPanel" type="Control" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("6_dispatch")
+
+[node name="ReportDialog" type="Control" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("7_report")
+
+[node name="InjuryDialog" type="Control" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("8_injury")
+
+[node name="MessageDialog" type="Control" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("9_message")
+
+[node name="ResultScreen" type="Control" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("10_result")
+
+[node name="ContractDialog" type="Control" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("11_contract")

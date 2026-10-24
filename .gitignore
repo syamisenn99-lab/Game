@@ -1,2 +1,5 @@
-# Godot（各プロジェクトのフォルダの中にできる）
+# Godot
 .godot/
+*.translation
+export_presets.cfg
+.mono/

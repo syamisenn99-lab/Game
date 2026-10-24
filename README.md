@@ -5,6 +5,8 @@
 - 企画: [docs/GDD.md](docs/GDD.md)
 - 照合画面（MVP）の設計: [docs/MVP_MATCHING_SCREEN.md](docs/MVP_MATCHING_SCREEN.md)
 
+> 別の試作「御簾の向こうの御方」は [misu/](misu/README.md)（独立した Godot プロジェクト）。
+
 ## 動かし方（Godot 4.6.3）
 
 1. Godot 4.6.3 でこのフォルダ（`project.godot`）を開く
